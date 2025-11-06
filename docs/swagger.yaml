@@ -231,6 +231,13 @@ definitions:
         - $ref: '#/definitions/models.UserView'
         description: Пользователь
     type: object
+  models.Role:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
   models.TeamView:
     properties:
       city:
@@ -426,6 +433,10 @@ definitions:
       phone:
         description: Телефон
         type: string
+      role:
+        allOf:
+        - $ref: '#/definitions/models.Role'
+        description: Роль
       status:
         description: Статус
         type: integer

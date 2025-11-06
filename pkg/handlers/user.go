@@ -652,8 +652,8 @@ func ParseToken(tokenString string) (*jwt.Token, error) {
 	// Извлекаем claims
 	if claims, ok := token.Claims.(*models.Claims); ok && token.Valid {
 		// Получаем значение jti
-		jti := claims.Id // jti хранится в поле Id структуры StandardClaims
-		//fmt.Println("jti:", jti)
+		// jti хранится в поле Id структуры StandardClaims
+		_ = claims // явно указываем, что переменная используется
 	} else {
 		log.Fatal("Неверный токен или claims")
 	}

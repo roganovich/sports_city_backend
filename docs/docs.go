@@ -1166,6 +1166,17 @@ const docTemplate = `{
                 }
             }
         },
+        "models.Role": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "models.TeamView": {
             "type": "object",
             "properties": {
@@ -1441,6 +1452,14 @@ const docTemplate = `{
                 "phone": {
                     "description": "Телефон",
                     "type": "string"
+                },
+                "role": {
+                    "description": "Роль",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.Role"
+                        }
+                    ]
                 },
                 "status": {
                     "description": "Статус",
