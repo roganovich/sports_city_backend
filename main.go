@@ -1,17 +1,18 @@
 package main
 
 import (
-	"goland_api/pkg/handlers"
-	"goland_api/pkg/database"
-	"goland_api/pkg/cmd"
-	"log"
-	"os"
 	"flag"
-	"net/http"
-	"github.com/gorilla/mux"
-	"github.com/swaggo/http-swagger"
 	_ "goland_api/docs"
+	"goland_api/pkg/cmd"
+	"goland_api/pkg/database"
+	"goland_api/pkg/handlers"
+	"log"
+	"net/http"
+	"os"
+
+	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"github.com/swaggo/http-swagger"
 )
 
 // @title My Golang API

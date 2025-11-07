@@ -35,17 +35,17 @@ go build -v .
 ```bash
 go run .
 ```
-#### Запустить контейнер Postgres
-```bash
-docker compose up -d go_db
-```
 #### Собрать контейнер API
 ```bash
-docker compose build
+docker-compose build
+```
+#### Запустить контейнер Postgres
+```bash
+docker-compose up -d sports_city_db
 ```
 #### Запустить контейнер API
 ```bash
-docker compose up go-app
+docker-compose up sports_city_backend
 ```
 #### Собрать контейнер API и запустить
 ```bash
