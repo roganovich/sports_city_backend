@@ -1,13 +1,14 @@
 package handlers
 
 import (
-	"goland_api/pkg/models"
-	"goland_api/pkg/database"
+	"database/sql"
 	"encoding/json"
+	"fmt"
+	"goland_api/pkg/database"
+	"goland_api/pkg/models"
 	"log"
 	"net/http"
 	"strconv"
-	"database/sql"
 
 	"github.com/go-playground/validator"
 	"github.com/gorilla/mux"
@@ -50,27 +51,27 @@ func GetTeams() http.HandlerFunc {
 				&media,
 				&teamView.Status,
 				&teamView.CreatedAt,
-				); err != nil {
+			); err != nil {
 				log.Println(err)
 			}
-			if (responsible != 0) {
+			if responsible != 0 {
 				errorResponsible, responsibleUser := getUserViewById(int64(responsible))
 				if errorResponsible != nil {
 					log.Println(errorResponsible.Error())
-				}else{
+				} else {
 					teamView.Responsible = responsibleUser
 				}
 			}
-			if (logo.Valid){
+			if logo.Valid {
 				var logoFile models.Media
 				errorMedia, logoFile := getOneMedia(logo.String)
-				if  errorMedia != nil {
+				if errorMedia != nil {
 					log.Println(errorMedia.Error())
-				}else{
+				} else {
 					teamView.Logo = &logoFile
 				}
 			}
-			if (media != nil && len(media) > 0){
+			if media != nil && len(media) > 0 {
 				var mediaList []models.Media
 				var mediaFiles []string
 				err := json.Unmarshal(media, &mediaFiles)
@@ -79,9 +80,9 @@ func GetTeams() http.HandlerFunc {
 				}
 				for _, mediaFile := range mediaFiles {
 					errorMedia, mediaFile := getOneMedia(mediaFile)
-					if  errorMedia != nil {
+					if errorMedia != nil {
 						log.Println(errorMedia.Error())
-					}else{
+					} else {
 						mediaList = append(mediaList, mediaFile)
 					}
 				}
@@ -120,24 +121,24 @@ func getOneTeamById(paramId int64) (error, models.TeamView) {
 		return err, teamView
 	}
 
-	if (responsible != 0) {
+	if responsible != 0 {
 		errorResponsible, responsibleUser := getUserViewById(int64(responsible))
 		if errorResponsible != nil {
 			log.Println(errorResponsible.Error())
-		}else{
+		} else {
 			teamView.Responsible = responsibleUser
 		}
 	}
-	if (logo.Valid){
+	if logo.Valid {
 		var logoFile models.Media
 		errorMedia, logoFile := getOneMedia(logo.String)
-		if  errorMedia != nil {
+		if errorMedia != nil {
 			log.Println(errorMedia.Error())
-		}else{
+		} else {
 			teamView.Logo = &logoFile
 		}
 	}
-	if (media != nil && len(media) > 0){
+	if media != nil && len(media) > 0 {
 		var mediaList []models.Media
 		var mediaFiles []string
 		err := json.Unmarshal(media, &mediaFiles)
@@ -146,9 +147,9 @@ func getOneTeamById(paramId int64) (error, models.TeamView) {
 		}
 		for _, mediaFile := range mediaFiles {
 			errorMedia, mediaFile := getOneMedia(mediaFile)
-			if  errorMedia != nil {
+			if errorMedia != nil {
 				log.Println(errorMedia.Error())
-			}else{
+			} else {
 				mediaList = append(mediaList, mediaFile)
 			}
 		}
@@ -173,11 +174,10 @@ func GetTeam() http.HandlerFunc {
 		paramId, _ := strconv.Atoi(vars["id"])
 
 		errorResponse, teamView := getOneTeamById(int64(paramId))
-		if  errorResponse != nil {
+		if errorResponse != nil {
 			http.Error(w, errorResponse.Error(), http.StatusBadRequest)
 			return
 		}
-
 
 		json.NewEncoder(w).Encode(teamView)
 	}
@@ -190,6 +190,17 @@ func validateCreateTeamRequest(r *http.Request) (error, models.CreateTeamRequest
 	}
 	validate := validator.New()
 	if validation := validate.Struct(req); validation != nil {
+		return validation, req
+	}
+
+	// Check for uniqueness of name and city
+	var count int
+	err := database.DB.QueryRow("SELECT COUNT(*) FROM teams WHERE name = $1 AND city = $2", req.Name, req.City).Scan(&count)
+	if err != nil {
+		return err, req
+	}
+	if count > 0 {
+		validation := fmt.Errorf("Команда с именем '%s' из города '%s' уже существует", req.Name, req.City)
 		return validation, req
 	}
 
@@ -234,7 +245,7 @@ func CreateTeam() http.HandlerFunc {
 
 		if r.Method == http.MethodPost {
 			validation, teamRequest := validateCreateTeamRequest(r)
-			if  validation != nil {
+			if validation != nil {
 				http.Error(w, validation.Error(), http.StatusBadRequest)
 				return
 			}
@@ -301,7 +312,7 @@ func UpdateTeam() http.HandlerFunc {
 		if r.Method == http.MethodPut {
 
 			validation, teamRequest := validateUpdatedAtTeamRequest(r)
-			if  validation != nil {
+			if validation != nil {
 				http.Error(w, validation.Error(), http.StatusBadRequest)
 				return
 			}
@@ -330,7 +341,7 @@ func UpdateTeam() http.HandlerFunc {
 			}
 
 			errorResponse, teamView := getOneTeamById(int64(paramId))
-			if  errorResponse != nil {
+			if errorResponse != nil {
 				http.Error(w, errorResponse.Error(), http.StatusBadRequest)
 				return
 			}
@@ -389,5 +400,3 @@ func DeleteTeam() http.HandlerFunc {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
 }
-
-
