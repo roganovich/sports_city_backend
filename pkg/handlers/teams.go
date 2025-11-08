@@ -37,7 +37,7 @@ func GetTeams() http.HandlerFunc {
 			var teamView models.TeamView
 			var responsible int
 			var logo sql.NullString
-			var media json.RawMessage
+			var media sql.NullString
 
 			if err := rows.Scan(
 				&teamView.ID,
@@ -71,10 +71,10 @@ func GetTeams() http.HandlerFunc {
 					teamView.Logo = &logoFile
 				}
 			}
-			if media != nil && len(media) > 0 {
+			if media.Valid && len(media.String) > 0 {
 				var mediaList []models.Media
 				var mediaFiles []string
-				err := json.Unmarshal(media, &mediaFiles)
+				err := json.Unmarshal([]byte(media.String), &mediaFiles)
 				if err != nil {
 					log.Println("Ошибка при парсинге JSON:", err)
 				}
@@ -102,7 +102,7 @@ func getOneTeamById(paramId int64) (error, models.TeamView) {
 	var teamView models.TeamView
 	var responsible int
 	var logo sql.NullString
-	var media json.RawMessage
+	var media sql.NullString
 
 	err := database.DB.QueryRow("SELECT id, name, description, city, uniform_color, participant_count, responsible_id, logo, media, status, created_at FROM teams WHERE id = $1", int64(paramId)).Scan(
 		&teamView.ID,
@@ -138,10 +138,10 @@ func getOneTeamById(paramId int64) (error, models.TeamView) {
 			teamView.Logo = &logoFile
 		}
 	}
-	if media != nil && len(media) > 0 {
+	if media.Valid && len(media.String) > 0 {
 		var mediaList []models.Media
 		var mediaFiles []string
-		err := json.Unmarshal(media, &mediaFiles)
+		err := json.Unmarshal([]byte(media.String), &mediaFiles)
 		if err != nil {
 			log.Println("Ошибка при парсинге JSON:", err)
 		}
@@ -175,7 +175,7 @@ func GetTeam() http.HandlerFunc {
 
 		errorResponse, teamView := getOneTeamById(int64(paramId))
 		if errorResponse != nil {
-			http.Error(w, errorResponse.Error(), http.StatusBadRequest)
+			SendJSONError(w, http.StatusBadRequest, errorResponse.Error())
 			return
 		}
 
@@ -246,7 +246,7 @@ func CreateTeam() http.HandlerFunc {
 		if r.Method == http.MethodPost {
 			validation, teamRequest := validateCreateTeamRequest(r)
 			if validation != nil {
-				http.Error(w, validation.Error(), http.StatusBadRequest)
+				SendJSONError(w, http.StatusBadRequest, validation.Error())
 				return
 			}
 
@@ -271,7 +271,7 @@ func CreateTeam() http.HandlerFunc {
 
 			errTeam, teamView := getOneTeamById(int64(team.ID))
 			if errTeam != nil {
-				http.Error(w, errTeam.Error(), http.StatusBadRequest)
+				SendJSONError(w, http.StatusBadRequest, errTeam.Error())
 				return
 			}
 			json.NewEncoder(w).Encode(teamView)
@@ -280,7 +280,7 @@ func CreateTeam() http.HandlerFunc {
 
 		// Если метод не поддерживается
 		w.Header().Set("Allow", "POST, OPTIONS")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		SendJSONError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
 	}
 }
 
@@ -313,7 +313,7 @@ func UpdateTeam() http.HandlerFunc {
 
 			validation, teamRequest := validateUpdatedAtTeamRequest(r)
 			if validation != nil {
-				http.Error(w, validation.Error(), http.StatusBadRequest)
+				SendJSONError(w, http.StatusBadRequest, validation.Error())
 				return
 			}
 			var team models.Team
@@ -336,13 +336,13 @@ func UpdateTeam() http.HandlerFunc {
 				AUTH.ID)
 			if errUpdate != nil {
 				log.Println(errUpdate)
-				http.Error(w, errUpdate.Error(), http.StatusBadRequest)
+				SendJSONError(w, http.StatusBadRequest, errUpdate.Error())
 
 			}
 
 			errorResponse, teamView := getOneTeamById(int64(paramId))
 			if errorResponse != nil {
-				http.Error(w, errorResponse.Error(), http.StatusBadRequest)
+				SendJSONError(w, http.StatusBadRequest, errorResponse.Error())
 				return
 			}
 			json.NewEncoder(w).Encode(teamView)
@@ -351,7 +351,7 @@ func UpdateTeam() http.HandlerFunc {
 
 		// Если метод не поддерживается
 		w.Header().Set("Allow", "PUT, OPTIONS")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		SendJSONError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
 	}
 }
 
@@ -397,6 +397,6 @@ func DeleteTeam() http.HandlerFunc {
 
 		// Если метод не поддерживается
 		w.Header().Set("Allow", "DELETE, OPTIONS")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		SendJSONError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
 	}
 }

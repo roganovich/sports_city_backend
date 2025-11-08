@@ -1,21 +1,25 @@
 package handlers
 
 import (
+	"encoding/json"
 	"goland_api/pkg/models"
 	"goland_api/pkg/services/dadata"
-	"encoding/json"
 	"log"
 	"net/http"
 )
+
 // @Summary Получить подсказку по части адреса
 // @Description Получить подсказку по части адреса
 // @Tags Адреса
+// @Accept  application/json
+// @Produce  application/json
+// @Param query query string true "Часть адреса для поиска"
 // @Success 200 {object} models.AddressResponse
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 413 {object} models.ErrorResponse
 // @Failure 415 {object} models.ErrorResponse
 // @Failure 500 {object} models.ErrorResponse
-// @Router /api/address/suggests [get]
+// @Router /api/address/suggest [post]
 func SuggestAddress() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodOptions {
@@ -64,6 +68,6 @@ func SuggestAddress() http.HandlerFunc {
 
 		// Если метод не поддерживается
 		w.Header().Set("Allow", "POST, OPTIONS")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		SendJSONError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
 	}
 }

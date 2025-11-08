@@ -40,6 +40,8 @@ definitions:
         type: boolean
       places:
         type: integer
+      slug:
+        type: string
       square:
         type: integer
       toilet:
@@ -107,6 +109,7 @@ definitions:
       email:
         type: string
       id:
+        format: int64
         type: integer
       name:
         maxLength: 128
@@ -173,12 +176,26 @@ definitions:
         type: boolean
       places:
         type: integer
+      slug:
+        type: string
       square:
         type: integer
       status:
         type: integer
       toilet:
         type: boolean
+    type: object
+  models.LoginUserRequest:
+    properties:
+      email:
+        type: string
+      password:
+        maxLength: 128
+        minLength: 4
+        type: string
+    required:
+    - email
+    - password
     type: object
   models.Media:
     properties:
@@ -308,6 +325,8 @@ definitions:
         type: boolean
       places:
         type: integer
+      slug:
+        type: string
       square:
         type: integer
       toilet:
@@ -451,13 +470,23 @@ definitions:
 host: localhost:8080
 info:
   contact: {}
-  description: This is a sample server.
-  title: My Golang API
+  description: Приложения бронирования спортивных площадок.
+  title: Спортивный город
   version: "1.0"
 paths:
-  /api/address/suggests:
-    get:
+  /api/address/suggest:
+    post:
+      consumes:
+      - application/json
       description: Получить подсказку по части адреса
+      parameters:
+      - description: Часть адреса для поиска
+        in: query
+        name: query
+        required: true
+        type: string
+      produces:
+      - application/json
       responses:
         "200":
           description: OK
@@ -483,30 +512,6 @@ paths:
       tags:
       - Адреса
   /api/auth:
-    get:
-      description: Получение информации о пользователе по идентификатору
-      parameters:
-      - description: ID пользователя
-        in: path
-        name: id
-        required: true
-        type: integer
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.User'
-        "400":
-          description: Bad Request
-          schema:
-            type: Bad
-        "404":
-          description: Not Found
-          schema:
-            type: Not
-      summary: Возвращает информацию о пользователе по ID
-      tags:
-      - Пользователи
     post:
       description: Создание нового пользователя
       parameters:
@@ -528,11 +533,93 @@ paths:
       summary: Создание нового пользователя
       tags:
       - Пользователи
+  /api/auth/info:
+    get:
+      consumes:
+      - application/json
+      description: Получение информации о текущем аутентифицированном пользователе
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserView'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Возвращает информацию о текущем пользователе
+      tags:
+      - Аутентификация
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Аутентификация пользователя по email и паролю с возвратом JWT токена
+      parameters:
+      - description: Учетные данные пользователя
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: JWT токен
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Аутентификация пользователя
+      tags:
+      - Аутентификация
+  /api/auth/refresh:
+    post:
+      description: Обновление JWT токена для аутентифицированного пользователя
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Новый JWT токен
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Обновление JWT токена
+      tags:
+      - Аутентификация
   /api/fields:
     get:
       consumes:
       - application/json
-      description: Получение списка всех команд
+      description: Получить список всех площадок
       responses:
         "200":
           description: OK
@@ -548,13 +635,13 @@ paths:
           description: Internal Server Error
           schema:
             type: Internal
-      summary: Возвращает список всех команд
+      summary: Получить все площадки
       tags:
       - Площадки
     post:
-      description: Создание новой команды
+      description: Создать новую спортивную площадку с предоставленными данными
       parameters:
-      - description: Данные для создания новой команды
+      - description: Данные для создания новой площадки
         in: body
         name: createField
         required: true
@@ -569,38 +656,69 @@ paths:
           description: Unprocessable Entity
           schema:
             type: Unprocessable
-      summary: Создание новой команды
+      summary: Создать новую площадку
       tags:
       - Площадки
   /api/fields/{id}:
     delete:
-      description: Удаление команды по идентификатору
+      description: Удалить спортивную площадку по её идентификатору
       parameters:
-      - description: ID команды
+      - description: ID площадки
         in: path
         name: id
         required: true
         type: integer
       responses:
-        "204":
-          description: No Content
+        "200":
+          description: Площадка удалена
           schema:
-            type: "No"
+            type: string
         "404":
           description: Not Found
           schema:
             type: Not
-      summary: Удаляет команду по ID
+      summary: Удалить площадку по ID
       tags:
       - Площадки
-    get:
-      description: Получение информации о команде по идентификатору
+    put:
+      description: Обновить существующую спортивную площадку с предоставленными данными
       parameters:
-      - description: ID команды
+      - description: Данные для обновления площадки
+        in: body
+        name: updateField
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateFieldRequest'
+      - description: ID площадки
         in: path
         name: id
         required: true
         type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.FieldView'
+        "404":
+          description: Not Found
+          schema:
+            type: Not
+        "422":
+          description: Unprocessable Entity
+          schema:
+            type: Unprocessable
+      summary: Обновить существующую площадку
+      tags:
+      - Площадки
+  /api/fields/{slug}:
+    get:
+      description: Получить информацию о площадке по её slug
+      parameters:
+      - description: Slug площадки
+        in: path
+        name: slug
+        required: true
+        type: string
       responses:
         "200":
           description: OK
@@ -614,37 +732,7 @@ paths:
           description: Not Found
           schema:
             type: Not
-      summary: Возвращает информацию о команде по ID
-      tags:
-      - Площадки
-    put:
-      description: Обновление существующей команды
-      parameters:
-      - description: Данные для обновления команды
-        in: body
-        name: updateField
-        required: true
-        schema:
-          $ref: '#/definitions/models.UpdateFieldRequest'
-      - description: ID команды
-        in: path
-        name: id
-        required: true
-        type: integer
-      responses:
-        "204":
-          description: No Content
-          schema:
-            type: "No"
-        "404":
-          description: Not Found
-          schema:
-            type: Not
-        "422":
-          description: Unprocessable Entity
-          schema:
-            type: Unprocessable
-      summary: Обновление существующей команды
+      summary: Получить площадку по slug
       tags:
       - Площадки
   /api/media/preloader:
@@ -684,7 +772,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: Получение списка всех команд
+      description: Получение списка всех аренд
       responses:
         "200":
           description: OK
@@ -700,13 +788,13 @@ paths:
           description: Internal Server Error
           schema:
             type: Internal
-      summary: Возвращает список всех команд
+      summary: Возвращает список всех аренд
       tags:
       - Аренда
     post:
-      description: Создание новой команды
+      description: Создание новой аренды
       parameters:
-      - description: Данные для создания новой команды
+      - description: Данные для создания новой аренды
         in: body
         name: createRental
         required: true
@@ -721,14 +809,14 @@ paths:
           description: Unprocessable Entity
           schema:
             type: Unprocessable
-      summary: Создание новой команды
+      summary: Создание новой аренды
       tags:
       - Аренда
   /api/rentals/{id}:
     delete:
-      description: Удаление команды по идентификатору
+      description: Удаление аренды по идентификатору
       parameters:
-      - description: ID команды
+      - description: ID аренды
         in: path
         name: id
         required: true
@@ -742,13 +830,13 @@ paths:
           description: Not Found
           schema:
             type: Not
-      summary: Удаляет команду по ID
+      summary: Удаляет аренду по ID
       tags:
       - Аренда
     get:
-      description: Получение информации о команде по идентификатору
+      description: Получение информации об аренде по идентификатору
       parameters:
-      - description: ID команды
+      - description: ID аренды
         in: path
         name: id
         required: true
@@ -766,7 +854,7 @@ paths:
           description: Not Found
           schema:
             type: Not
-      summary: Возвращает информацию о команде по ID
+      summary: Возвращает информацию об аренде по ID
       tags:
       - Аренда
   /api/teams:

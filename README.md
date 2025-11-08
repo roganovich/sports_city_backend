@@ -70,13 +70,18 @@ docker images
 
 #### Создать файл миграции
 ```bash
-migrate create -ext sql -dir db/migration -seq create_user_role
+migrate create -ext sql -dir db/migration -seq update_field_metia_logo
+```
+```bash
+/home/roman/go/bin/migrate create -ext sql -dir db/migration -seq add_slug_to_fields
 ```
 #### Выполнить
 ```bash
 migrate -path db/migration -database "postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable" -verbose up
 ```
-
+```bash
+/home/roman/go/bin/migrate -path db/migration -database "postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable" -verbose up
+```
 ### Документация OpenAPI
 
 #### Сгенирировать Swagger

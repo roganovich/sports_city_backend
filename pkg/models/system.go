@@ -1,14 +1,13 @@
 package models
 
-import(
+import (
 	"time"
 )
 
 type ErrorResponse struct {
-	StatusCode 	int    						`json:"statusCode"`
-	Message    	string 						`json:"message"`
-	Errors	   	[]ValidationErrorResponse	`json:"errors"`
-
+	StatusCode int                       `json:"statusCode"`
+	Message    string                    `json:"message"`
+	Errors     []ValidationErrorResponse `json:"errors"`
 }
 
 type ValidationErrorResponse struct {
@@ -16,19 +15,25 @@ type ValidationErrorResponse struct {
 	Message string `json:"message"`
 }
 
+// SimpleErrorResponse представляет структуру простого JSON ответа об ошибке
+type SimpleErrorResponse struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
 // PaginationResponse представляет структуру ответа с пагинацией
 type PaginationResponse struct {
-	Pagination Pagination 		`json:"pagination"` // Информация о пагинации
-	Filter     interface{}     		`json:"filter"`     // Параметры фильтрации
-	Data       []interface{}    `json:"data"`       // Данные
+	Pagination Pagination    `json:"pagination"` // Информация о пагинации
+	Filter     interface{}   `json:"filter"`     // Параметры фильтрации
+	Data       []interface{} `json:"data"`       // Данные
 }
 
 // Pagination содержит информацию о пагинации
 type Pagination struct {
-	Page       int `json:"page"`        // Текущая страница
-	PerPage    int `json:"per_page"`    // Количество элементов на странице
-	TotalPages int `json:"pages"` 		// Общее количество страниц
-	TotalItems int `json:"total"` 		// Общее количество элементов
+	Page       int `json:"page"`     // Текущая страница
+	PerPage    int `json:"per_page"` // Количество элементов на странице
+	TotalPages int `json:"pages"`    // Общее количество страниц
+	TotalItems int `json:"total"`    // Общее количество элементов
 }
 
 // Кастомный тип для времени

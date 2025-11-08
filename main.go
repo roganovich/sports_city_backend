@@ -12,11 +12,11 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
-	"github.com/swaggo/http-swagger"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
-// @title My Golang API
-// @description This is a sample server.
+// @title Спортивный город
+// @description Приложения бронирования спортивных площадок.
 // @version 1.0
 // @host localhost:8080
 // @BasePath /api
@@ -71,16 +71,16 @@ func main() {
 
 	// Площадки
 	router.HandleFunc("/api/fields", handlers.GetFields()).Methods("GET")
-	router.HandleFunc("/api/fields/{id}", handlers.GetField()).Methods("GET")
+	router.HandleFunc("/api/fields/{slug}", handlers.GetField()).Methods("GET")
 	router.HandleFunc("/api/fields", handlers.AuthAdminMiddleware(handlers.CreateField())).Methods("POST", "OPTIONS")
-	router.HandleFunc("/api/fields/{id}", handlers.AuthAdminMiddleware(handlers.UpdateField())).Methods("PUT", "OPTIONS")
-	router.HandleFunc("/api/fields/{id}", handlers.AuthAdminMiddleware(handlers.DeleteField())).Methods("DELETE", "OPTIONS")
+	router.HandleFunc("/api/fields/{slug}", handlers.AuthAdminMiddleware(handlers.UpdateField())).Methods("PUT", "OPTIONS")
+	router.HandleFunc("/api/fields/{slug}", handlers.AuthAdminMiddleware(handlers.DeleteField())).Methods("DELETE", "OPTIONS")
 
 	// Аренда
 	router.HandleFunc("/api/rentals", handlers.GetRentals()).Methods("GET")
 	router.HandleFunc("/api/rentals/{id}", handlers.GetRental()).Methods("GET")
 	router.HandleFunc("/api/rentals", handlers.AuthMiddleware(handlers.CreateRental())).Methods("POST", "OPTIONS")
-	router.HandleFunc("/api/rentals/{id}", handlers.AuthMiddleware(handlers.DeleteField())).Methods("DELETE", "OPTIONS")
+	router.HandleFunc("/api/rentals/{id}", handlers.AuthMiddleware(handlers.DeleteRental())).Methods("DELETE", "OPTIONS")
 
 	// Media
 	router.HandleFunc("/api/media/preloader", handlers.AuthMiddleware(handlers.Preloader())).Methods("POST", "OPTIONS")

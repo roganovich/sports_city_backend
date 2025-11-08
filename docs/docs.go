@@ -15,13 +15,28 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/address/suggests": {
-            "get": {
+        "/api/address/suggest": {
+            "post": {
                 "description": "Получить подсказку по части адреса",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Адреса"
                 ],
                 "summary": "Получить подсказку по части адреса",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Часть адреса для поиска",
+                        "name": "query",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -57,42 +72,6 @@ const docTemplate = `{
             }
         },
         "/api/auth": {
-            "get": {
-                "description": "Получение информации о пользователе по идентификатору",
-                "tags": [
-                    "Пользователи"
-                ],
-                "summary": "Возвращает информацию о пользователе по ID",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "ID пользователя",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.User"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "Bad"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "Not"
-                        }
-                    }
-                }
-            },
             "post": {
                 "description": "Создание нового пользователя",
                 "tags": [
@@ -126,16 +105,145 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/auth/info": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Получение информации о текущем аутентифицированном пользователе",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Аутентификация"
+                ],
+                "summary": "Возвращает информацию о текущем пользователе",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.UserView"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/login": {
+            "post": {
+                "description": "Аутентификация пользователя по email и паролю с возвратом JWT токена",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Аутентификация"
+                ],
+                "summary": "Аутентификация пользователя",
+                "parameters": [
+                    {
+                        "description": "Учетные данные пользователя",
+                        "name": "credentials",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.LoginUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "JWT токен",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/refresh": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Обновление JWT токена для аутентифицированного пользователя",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Аутентификация"
+                ],
+                "summary": "Обновление JWT токена",
+                "responses": {
+                    "200": {
+                        "description": "Новый JWT токен",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/fields": {
             "get": {
-                "description": "Получение списка всех команд",
+                "description": "Получить список всех площадок",
                 "consumes": [
                     "application/json"
                 ],
                 "tags": [
                     "Площадки"
                 ],
-                "summary": "Возвращает список всех команд",
+                "summary": "Получить все площадки",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -161,14 +269,14 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Создание новой команды",
+                "description": "Создать новую спортивную площадку с предоставленными данными",
                 "tags": [
                     "Площадки"
                 ],
-                "summary": "Создание новой команды",
+                "summary": "Создать новую площадку",
                 "parameters": [
                     {
-                        "description": "Данные для создания новой команды",
+                        "description": "Данные для создания новой площадки",
                         "name": "createField",
                         "in": "body",
                         "required": true,
@@ -194,16 +302,25 @@ const docTemplate = `{
             }
         },
         "/api/fields/{id}": {
-            "get": {
-                "description": "Получение информации о команде по идентификатору",
+            "put": {
+                "description": "Обновить существующую спортивную площадку с предоставленными данными",
                 "tags": [
                     "Площадки"
                 ],
-                "summary": "Возвращает информацию о команде по ID",
+                "summary": "Обновить существующую площадку",
                 "parameters": [
                     {
+                        "description": "Данные для обновления площадки",
+                        "name": "updateField",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.UpdateFieldRequest"
+                        }
+                    },
+                    {
                         "type": "integer",
-                        "description": "ID команды",
+                        "description": "ID площадки",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -214,51 +331,6 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/models.FieldView"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "Bad"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "Not"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "description": "Обновление существующей команды",
-                "tags": [
-                    "Площадки"
-                ],
-                "summary": "Обновление существующей команды",
-                "parameters": [
-                    {
-                        "description": "Данные для обновления команды",
-                        "name": "updateField",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.UpdateFieldRequest"
-                        }
-                    },
-                    {
-                        "type": "integer",
-                        "description": "ID команды",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content",
-                        "schema": {
-                            "type": "No"
                         }
                     },
                     "404": {
@@ -276,25 +348,63 @@ const docTemplate = `{
                 }
             },
             "delete": {
-                "description": "Удаление команды по идентификатору",
+                "description": "Удалить спортивную площадку по её идентификатору",
                 "tags": [
                     "Площадки"
                 ],
-                "summary": "Удаляет команду по ID",
+                "summary": "Удалить площадку по ID",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "ID команды",
+                        "description": "ID площадки",
                         "name": "id",
                         "in": "path",
                         "required": true
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "No Content",
+                    "200": {
+                        "description": "Площадка удалена",
                         "schema": {
-                            "type": "No"
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "Not"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/fields/{slug}": {
+            "get": {
+                "description": "Получить информацию о площадке по её slug",
+                "tags": [
+                    "Площадки"
+                ],
+                "summary": "Получить площадку по slug",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Slug площадки",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.FieldView"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "Bad"
                         }
                     },
                     "404": {
@@ -358,14 +468,14 @@ const docTemplate = `{
         },
         "/api/rentals": {
             "get": {
-                "description": "Получение списка всех команд",
+                "description": "Получение списка всех аренд",
                 "consumes": [
                     "application/json"
                 ],
                 "tags": [
                     "Аренда"
                 ],
-                "summary": "Возвращает список всех команд",
+                "summary": "Возвращает список всех аренд",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -391,14 +501,14 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Создание новой команды",
+                "description": "Создание новой аренды",
                 "tags": [
                     "Аренда"
                 ],
-                "summary": "Создание новой команды",
+                "summary": "Создание новой аренды",
                 "parameters": [
                     {
-                        "description": "Данные для создания новой команды",
+                        "description": "Данные для создания новой аренды",
                         "name": "createRental",
                         "in": "body",
                         "required": true,
@@ -425,15 +535,15 @@ const docTemplate = `{
         },
         "/api/rentals/{id}": {
             "get": {
-                "description": "Получение информации о команде по идентификатору",
+                "description": "Получение информации об аренде по идентификатору",
                 "tags": [
                     "Аренда"
                 ],
-                "summary": "Возвращает информацию о команде по ID",
+                "summary": "Возвращает информацию об аренде по ID",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "ID команды",
+                        "description": "ID аренды",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -461,15 +571,15 @@ const docTemplate = `{
                 }
             },
             "delete": {
-                "description": "Удаление команды по идентификатору",
+                "description": "Удаление аренды по идентификатору",
                 "tags": [
                     "Аренда"
                 ],
-                "summary": "Удаляет команду по ID",
+                "summary": "Удаляет аренду по ID",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "ID команды",
+                        "description": "ID аренды",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -890,6 +1000,9 @@ const docTemplate = `{
                 "places": {
                     "type": "integer"
                 },
+                "slug": {
+                    "type": "string"
+                },
                 "square": {
                     "type": "integer"
                 },
@@ -982,7 +1095,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "type": "integer",
+                    "format": "int64"
                 },
                 "name": {
                     "type": "string",
@@ -1075,6 +1189,9 @@ const docTemplate = `{
                 "places": {
                     "type": "integer"
                 },
+                "slug": {
+                    "type": "string"
+                },
                 "square": {
                     "type": "integer"
                 },
@@ -1083,6 +1200,23 @@ const docTemplate = `{
                 },
                 "toilet": {
                     "type": "boolean"
+                }
+            }
+        },
+        "models.LoginUserRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "minLength": 4
                 }
             }
         },
@@ -1287,6 +1421,9 @@ const docTemplate = `{
                 "places": {
                     "type": "integer"
                 },
+                "slug": {
+                    "type": "string"
+                },
                 "square": {
                     "type": "integer"
                 },
@@ -1487,8 +1624,8 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "localhost:8080",
 	BasePath:         "/api",
 	Schemes:          []string{},
-	Title:            "My Golang API",
-	Description:      "This is a sample server.",
+	Title:            "Спортивный город",
+	Description:      "Приложения бронирования спортивных площадок.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

@@ -4,18 +4,19 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/go-playground/validator"
-	jwt "github.com/golang-jwt/jwt"
-	"github.com/gorilla/mux"
-	_ "github.com/lib/pq"
 	"goland_api/pkg/database"
 	"goland_api/pkg/models"
-	"golang.org/x/crypto/bcrypt"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/go-playground/validator"
+	jwt "github.com/golang-jwt/jwt"
+	"github.com/gorilla/mux"
+	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Документация для метода GetUsers
@@ -67,7 +68,7 @@ func getUserFromToken(token *jwt.Token) (error, *models.UserView) {
 		// Получаем значение jti
 		userEmail := claims.Id // jti хранится в поле Id структуры Claims
 		errorResponse, userView := getUserViewByEmail(userEmail)
-		if  errorResponse != nil {
+		if errorResponse != nil {
 			return errorResponse, nil
 		}
 
@@ -82,11 +83,11 @@ func getUserViewById(paramId int64) (error, models.UserView) {
 	var role models.Role
 
 	err := database.DB.QueryRow(
-		"SELECT " +
-			"u.id, u.name, u.email, u.phone, u.city, u.logo, u.media, u.status, u.created_at, " +
-			"r.id, r.name " +
-			"FROM users u " +
-			"join roles r on r.id = u.role_id " +
+		"SELECT "+
+			"u.id, u.name, u.email, u.phone, u.city, u.logo, u.media, u.status, u.created_at, "+
+			"r.id, r.name "+
+			"FROM users u "+
+			"join roles r on r.id = u.role_id "+
 			"WHERE email = $1", paramId).Scan(
 		&userView.ID,
 		&userView.Name,
@@ -110,11 +111,11 @@ func getUserViewByEmail(paramEmail string) (error, models.UserView) {
 	var role models.Role
 
 	err := database.DB.QueryRow(
-		"SELECT " +
-			"u.id, u.name, u.email, u.phone, u.city, u.logo, u.media, u.status, u.created_at, " +
-			"r.id, r.name " +
-			"FROM users u " +
-			"join roles r on r.id = u.role_id " +
+		"SELECT "+
+			"u.id, u.name, u.email, u.phone, u.city, u.logo, u.media, u.status, u.created_at, "+
+			"r.id, r.name "+
+			"FROM users u "+
+			"join roles r on r.id = u.role_id "+
 			"WHERE email = $1", paramEmail).Scan(
 		&userView.ID,
 		&userView.Name,
@@ -161,8 +162,8 @@ func GetUser() http.HandlerFunc {
 		paramId, _ := strconv.Atoi(vars["id"])
 
 		errorResponse, userView := getUserViewById(int64(paramId))
-		if  errorResponse != nil {
-			http.Error(w, errorResponse.Error(), http.StatusBadRequest)
+		if errorResponse != nil {
+			SendJSONError(w, http.StatusBadRequest, errorResponse.Error())
 			return
 		}
 
@@ -170,15 +171,18 @@ func GetUser() http.HandlerFunc {
 	}
 }
 
-// Документация для метода GetUser
-// @Summary Возвращает информацию о пользователе по ID
-// @Description Получение информации о пользователе по идентификатору
-// @Tags Пользователи
-// @Param id path int true "ID пользователя"
-// @Success 200 {object} models.User
-// @Failure 400 Bad Request
-// @Failure 404 Not Found
-// @Router /api/auth [get]
+// Документация для метода InfoUser
+// @Summary Возвращает информацию о текущем пользователе
+// @Description Получение информации о текущем аутентифицированном пользователе
+// @Tags Аутентификация
+// @Accept  application/json
+// @Produce  application/json
+// @Success 200 {object} models.UserView
+// @Failure 400 {object} models.ErrorResponse "Bad Request"
+// @Failure 401 {object} models.ErrorResponse "Unauthorized"
+// @Failure 500 {object} models.ErrorResponse "Internal Server Error"
+// @Security BearerAuth
+// @Router /api/auth/info [get]
 func InfoUser() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodOptions {
@@ -196,6 +200,16 @@ func InfoUser() http.HandlerFunc {
 	}
 }
 
+// @Summary Аутентификация пользователя
+// @Description Аутентификация пользователя по email и паролю с возвратом JWT токена
+// @Tags Аутентификация
+// @Param credentials body models.LoginUserRequest true "Учетные данные пользователя"
+// @Accept  application/json
+// @Produce  application/json
+// @Success 200 {string} string "JWT токен"
+// @Failure 400 {object} models.ErrorResponse "Bad Request"
+// @Failure 401 {object} models.ErrorResponse "Unauthorized"
+// @Router /api/auth/login [post]
 func Login() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodOptions {
@@ -212,26 +226,26 @@ func Login() http.HandlerFunc {
 		if r.Method == http.MethodPost {
 			errorValidation, userRequest := validateLoginUserRequest(r)
 			if errorValidation != nil {
-				http.Error(w, errorValidation.Error(), http.StatusBadRequest)
+				SendJSONError(w, http.StatusBadRequest, errorValidation.Error())
 				return
 			}
 
 			errorQuery, user := getUserViewByIdByEmail(userRequest.Email)
 			if errorQuery != nil {
-				http.Error(w, errorQuery.Error(), http.StatusBadRequest)
+				SendJSONError(w, http.StatusBadRequest, errorQuery.Error())
 				return
 			}
 
 			checkPassword := checkPasswordHash(userRequest.Password, user.Password)
 
 			if checkPassword != true {
-				http.Error(w, "Invalid password", http.StatusBadRequest)
+				SendJSONError(w, http.StatusBadRequest, "Invalid password")
 				return
 			}
 
 			tokenString, errorToken := getNewToken(user.Name, user.Email)
 			if errorToken != nil {
-				http.Error(w, errorToken.Error(), http.StatusBadRequest)
+				SendJSONError(w, http.StatusBadRequest, errorToken.Error())
 			}
 
 			json.NewEncoder(w).Encode(tokenString)
@@ -240,10 +254,19 @@ func Login() http.HandlerFunc {
 
 		// Если метод не поддерживается
 		w.Header().Set("Allow", "POST, OPTIONS")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		SendJSONError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
 	}
 }
 
+// @Summary Обновление JWT токена
+// @Description Обновление JWT токена для аутентифицированного пользователя
+// @Tags Аутентификация
+// @Produce  application/json
+// @Success 200 {string} string "Новый JWT токен"
+// @Failure 400 {object} models.ErrorResponse "Bad Request"
+// @Failure 401 {object} models.ErrorResponse "Unauthorized"
+// @Security BearerAuth
+// @Router /api/auth/refresh [post]
 func Refresh() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodOptions {
@@ -260,7 +283,7 @@ func Refresh() http.HandlerFunc {
 		if r.Method == http.MethodPost {
 			tokenString, errorToken := getNewToken(AUTH.Name, AUTH.Email)
 			if errorToken != nil {
-				http.Error(w, errorToken.Error(), http.StatusBadRequest)
+				SendJSONError(w, http.StatusBadRequest, errorToken.Error())
 			}
 
 			json.NewEncoder(w).Encode(tokenString)
@@ -269,7 +292,7 @@ func Refresh() http.HandlerFunc {
 
 		// Если метод не поддерживается
 		w.Header().Set("Allow", "POST, OPTIONS")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		SendJSONError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
 	}
 }
 
@@ -310,14 +333,14 @@ func CreateUser() http.HandlerFunc {
 				}
 				// Создаем структуру для ответа с ошибкой
 				errorData := models.ErrorResponse{
-					StatusCode:  http.StatusBadRequest,
-					Message: "Возникла ошибка при регистрации",
-					Errors: validationErrors,
+					StatusCode: http.StatusBadRequest,
+					Message:    "Возникла ошибка при регистрации",
+					Errors:     validationErrors,
 				}
 				// Сериализуем ошибки в JSON
 				jsonResponse, err := json.Marshal(errorData)
 				if err != nil {
-					http.Error(w, "Ошибка при формировании ответа", http.StatusInternalServerError)
+					SendJSONError(w, http.StatusInternalServerError, "Ошибка при формировании ответа")
 					return
 				}
 				// Устанавливаем заголовок Content-Type
@@ -337,13 +360,13 @@ func CreateUser() http.HandlerFunc {
 
 			err := database.DB.QueryRow("INSERT INTO users (name, email, phone, password) VALUES ($1, $2, $3, $4) RETURNING id", user.Name, user.Email, user.Phone, user.Password).Scan(&user.ID)
 			if err != nil {
-				http.Error(w, "Возникла ошибка при регистрации", http.StatusBadRequest)
+				SendJSONError(w, http.StatusBadRequest, "Возникла ошибка при регистрации")
 				return
 			}
 
 			tokenString, errorToken := getNewToken(user.Name, user.Email)
 			if errorToken != nil {
-				http.Error(w, "Возникла ошибка при регистрации", http.StatusBadRequest)
+				SendJSONError(w, http.StatusBadRequest, "Возникла ошибка при регистрации")
 				return
 			}
 
@@ -353,7 +376,7 @@ func CreateUser() http.HandlerFunc {
 
 		// Если метод не поддерживается
 		w.Header().Set("Allow", "POST, OPTIONS")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		SendJSONError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
 	}
 }
 
@@ -395,14 +418,14 @@ func UpdateUser() http.HandlerFunc {
 				}
 				// Создаем структуру для ответа с ошибкой
 				errorData := models.ErrorResponse{
-					StatusCode:  http.StatusBadRequest,
-					Message: "Возникла ошибка при регистрации",
-					Errors: validationErrors,
+					StatusCode: http.StatusBadRequest,
+					Message:    "Возникла ошибка при регистрации",
+					Errors:     validationErrors,
 				}
 				// Сериализуем ошибки в JSON
 				jsonResponse, err := json.Marshal(errorData)
 				if err != nil {
-					http.Error(w, "Ошибка при формировании ответа", http.StatusInternalServerError)
+					SendJSONError(w, http.StatusInternalServerError, "Ошибка при формировании ответа")
 					return
 				}
 				// Устанавливаем заголовок Content-Type
@@ -414,7 +437,7 @@ func UpdateUser() http.HandlerFunc {
 				return
 			}
 
-			if (userRequest != nil){
+			if userRequest != nil {
 				AUTH.Name = userRequest.Name
 				AUTH.Email = userRequest.Email
 				AUTH.Phone = userRequest.Phone
@@ -435,13 +458,13 @@ func UpdateUser() http.HandlerFunc {
 				return
 			}
 
-			http.Error(w, "Ошибка при формировании ответа", http.StatusInternalServerError)
+			SendJSONError(w, http.StatusInternalServerError, "Ошибка при формировании ответа")
 			return
 		}
 
 		// Если метод не поддерживается
 		w.Header().Set("Allow", "PUT, OPTIONS")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		SendJSONError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
 	}
 }
 
@@ -617,9 +640,9 @@ func getNewToken(name string, email string) (string, error) {
 	claims := models.Claims{
 		Username: name,
 		StandardClaims: jwt.StandardClaims{
-			Id:       	email,
-			Subject:	name,
-			ExpiresAt: 	expiresAt,
+			Id:        email,
+			Subject:   name,
+			ExpiresAt: expiresAt,
 		},
 	}
 
@@ -673,4 +696,3 @@ func checkPasswordHash(password, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	return err == nil
 }
-

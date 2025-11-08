@@ -1,16 +1,19 @@
 package handlers
 
 import (
+	"encoding/json"
 	"goland_api/pkg/models"
 	"net/http"
 	"net/url"
 	"strconv"
+
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
 )
 
 // AUTH - глобальная переменная с авторизацией
 var AUTH *models.UserView
+
 // Массив допустимых ролей
 var UserRoles = map[int]bool{
 	1: true,
@@ -23,26 +26,26 @@ var AdminRoles = map[int]bool{
 
 // Middleware для проверки авторизации
 func getAuth(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		tokenString := authHeader[len("Bearer "):]
-		token, errToken := ParseToken(tokenString)
-		if errToken != nil {
-			http.Error(w, "Неверный токен", http.StatusBadRequest)
-			return
-		}
-
-		if !token.Valid {
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
-			return
-		}
-
-		errorResponse, userView := getUserFromToken(token)
-		if  errorResponse != nil {
-			http.Error(w, "Неверный токен", http.StatusBadRequest)
-			return
-		}
-		AUTH = userView
+	authHeader := r.Header.Get("Authorization")
+	tokenString := authHeader[len("Bearer "):]
+	token, errToken := ParseToken(tokenString)
+	if errToken != nil {
+		SendJSONError(w, http.StatusBadRequest, "Неверный токен")
 		return
+	}
+
+	if !token.Valid {
+		SendJSONError(w, http.StatusUnauthorized, "Invalid token")
+		return
+	}
+
+	errorResponse, userView := getUserFromToken(token)
+	if errorResponse != nil {
+		SendJSONError(w, http.StatusBadRequest, "Неверный токен")
+		return
+	}
+	AUTH = userView
+	return
 }
 
 func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -57,7 +60,7 @@ func AuthUserMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		getAuth(w, r)
 		if _, exists := UserRoles[AUTH.Role.ID]; !exists {
-			http.Error(w, "Роль пользователя недопустима", http.StatusBadRequest)
+			SendJSONError(w, http.StatusBadRequest, "Роль пользователя недопустима")
 			return
 		}
 		// Если токен валиден, передаем запрос следующему обработчику
@@ -69,7 +72,7 @@ func AuthAdminMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		getAuth(w, r)
 		if _, exists := AdminRoles[AUTH.Role.ID]; !exists {
-			http.Error(w, "Роль пользователя недопустима", http.StatusBadRequest)
+			SendJSONError(w, http.StatusBadRequest, "Роль пользователя недопустима")
 			return
 		}
 		// Если токен валиден, передаем запрос следующему обработчику
@@ -105,6 +108,22 @@ func JsonContentTypeMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		next.ServeHTTP(w, r)
 	})
+}
+
+// SendJSONError отправляет JSON ответ об ошибке
+func SendJSONError(w http.ResponseWriter, code int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+
+	errorResponse := models.SimpleErrorResponse{
+		Code:    code,
+		Message: message,
+	}
+
+	if err := json.NewEncoder(w).Encode(errorResponse); err != nil {
+		// Если не удалось закодировать JSON, отправляем простой текст
+		http.Error(w, message, code)
+	}
 }
 
 var (

@@ -1,20 +1,21 @@
 package handlers
 
 import (
-	"goland_api/pkg/models"
-	"goland_api/pkg/database"
 	"encoding/json"
+	"goland_api/pkg/database"
+	"goland_api/pkg/models"
+	"io"
 	"log"
 	"net/http"
 	"os"
-	"io"
-	"github.com/google/uuid"
-	"time"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/google/uuid"
 )
 
-// get team by id
+// getOneMedia получает информацию о медиафайле по его имени
 func getOneMedia(fileName string) (error, models.Media) {
 	var media models.Media
 	err := database.DB.QueryRow("SELECT * FROM medias WHERE name = $1", fileName).Scan(
@@ -27,7 +28,7 @@ func getOneMedia(fileName string) (error, models.Media) {
 		&media.CreatedAt,
 	)
 
-	if  err != nil {
+	if err != nil {
 		log.Println("Ошибка в getOneMedia", fileName, err.Error())
 	}
 
@@ -62,7 +63,7 @@ func Preloader() http.HandlerFunc {
 			file, fileHeader, errFile := r.FormFile("file")
 			if errFile != nil {
 				log.Println("Не удалось прочитать файл")
-				http.Error(w, "Не удалось прочитать файл", http.StatusBadRequest)
+				SendJSONError(w, http.StatusBadRequest, "Не удалось прочитать файл")
 				return
 			}
 			defer file.Close()
@@ -73,7 +74,7 @@ func Preloader() http.HandlerFunc {
 			f, err := os.OpenFile(dstPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
 			if err != nil {
 				log.Println("Не удалось открыть файл")
-				http.Error(w, "Не удалось открыть файл", http.StatusInternalServerError)
+				SendJSONError(w, http.StatusInternalServerError, "Не удалось открыть файл")
 				return
 			}
 			defer f.Close()
@@ -81,7 +82,7 @@ func Preloader() http.HandlerFunc {
 			fileSize, err := io.Copy(f, file)
 			if err != nil {
 				log.Println("Не удалось скопировать файл")
-				http.Error(w, "Не удалось скопировать файл", http.StatusInternalServerError)
+				SendJSONError(w, http.StatusInternalServerError, "Не удалось скопировать файл")
 				return
 			}
 
@@ -106,11 +107,11 @@ func Preloader() http.HandlerFunc {
 
 		// Если метод не поддерживается
 		w.Header().Set("Allow", "POST, OPTIONS")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		SendJSONError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
 	}
 }
 
-func getRandomName() string  {
+func getRandomName() string {
 	newUUID := uuid.New()
 
 	return newUUID.String()

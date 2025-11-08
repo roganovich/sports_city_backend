@@ -1,22 +1,23 @@
 package handlers
 
 import (
-	"goland_api/pkg/models"
-	"goland_api/pkg/database"
 	"encoding/json"
+	"goland_api/pkg/database"
+	"goland_api/pkg/models"
 	"log"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
-	"math"
+
 	"github.com/go-playground/validator"
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 )
 
 // Документация для метода GetRentals
-// @Summary Возвращает список всех команд
-// @Description Получение списка всех команд
+// @Summary Возвращает список всех аренд
+// @Description Получение списка всех аренд
 // @Tags Аренда
 // @Accept application/json
 // @Produces application/json
@@ -75,30 +76,30 @@ func GetRentals() http.HandlerFunc {
 				&rentalView.Duration,
 				&rentalView.Status,
 				&rentalView.CreatedAt,
-				); err != nil {
+			); err != nil {
 				log.Println(err)
 			}
-			if (fieldId != 0) {
+			if fieldId != 0 {
 				errorField, fieldView := getOneFieldById(int64(fieldId))
 				if errorField != nil {
 					log.Println(errorField.Error())
-				}else{
+				} else {
 					rentalView.Field = fieldView
 				}
 			}
-			if (teamId != 0) {
+			if teamId != 0 {
 				errorTeam, teamView := getOneTeamById(int64(teamId))
 				if errorTeam != nil {
 					log.Println(errorTeam.Error())
-				}else{
+				} else {
 					rentalView.Team = teamView
 				}
 			}
-			if (userId != 0) {
+			if userId != 0 {
 				errorUser, userView := getUserViewById(int64(userId))
 				if errorUser != nil {
 					log.Println(errorUser.Error())
-				}else{
+				} else {
 					rentalView.User = userView
 				}
 			}
@@ -111,7 +112,7 @@ func GetRentals() http.HandlerFunc {
 
 		var fiter models.RentalSearchFilter
 		validationFilterJsonError := json.NewDecoder(r.Body).Decode(&fiter)
-		if  validationFilterJsonError != nil {
+		if validationFilterJsonError != nil {
 			log.Println(validationFilterJsonError.Error())
 		}
 		validate := validator.New()
@@ -128,7 +129,7 @@ func GetRentals() http.HandlerFunc {
 				TotalItems: totalCount,
 			},
 			Filter: fiter,
-			Data: rentalsInterface,
+			Data:   rentalsInterface,
 		}
 
 		json.NewEncoder(w).Encode(response)
@@ -156,27 +157,27 @@ func getOneRentalById(paramId int64) (error, models.RentalView) {
 	if err != nil {
 		return err, rentalView
 	}
-	if (fieldId != 0) {
+	if fieldId != 0 {
 		errorField, fieldView := getOneFieldById(int64(fieldId))
 		if errorField != nil {
 			log.Println(errorField.Error())
-		}else{
+		} else {
 			rentalView.Field = fieldView
 		}
 	}
-	if (teamId != 0) {
+	if teamId != 0 {
 		errorTeam, teamView := getOneTeamById(int64(teamId))
 		if errorTeam != nil {
 			log.Println(errorTeam.Error())
-		}else{
+		} else {
 			rentalView.Team = teamView
 		}
 	}
-	if (userId != 0) {
+	if userId != 0 {
 		errorUser, userView := getUserViewById(int64(userId))
 		if errorUser != nil {
 			log.Println(errorUser.Error())
-		}else{
+		} else {
 			rentalView.User = userView
 		}
 	}
@@ -185,10 +186,10 @@ func getOneRentalById(paramId int64) (error, models.RentalView) {
 }
 
 // Документация для метода GetRental
-// @Summary Возвращает информацию о команде по ID
-// @Description Получение информации о команде по идентификатору
+// @Summary Возвращает информацию об аренде по ID
+// @Description Получение информации об аренде по идентификатору
 // @Tags Аренда
-// @Param id path int true "ID команды"
+// @Param id path int true "ID аренды"
 // @Success 200 {object} models.RentalView
 // @Failure 400 Bad Request
 // @Failure 404 Not Found
@@ -199,8 +200,8 @@ func GetRental() http.HandlerFunc {
 		paramId, _ := strconv.Atoi(vars["id"])
 
 		errorResponse, rentalView := getOneRentalById(int64(paramId))
-		if  errorResponse != nil {
-			http.Error(w, errorResponse.Error(), http.StatusBadRequest)
+		if errorResponse != nil {
+			SendJSONError(w, http.StatusBadRequest, errorResponse.Error())
 			return
 		}
 
@@ -222,10 +223,10 @@ func validateCreateRentalRequest(r *http.Request) (error, models.CreateRentalReq
 }
 
 // Документация для метода CreateRental
-// @Summary Создание новой команды
-// @Description Создание новой команды
+// @Summary Создание новой аренды
+// @Description Создание новой аренды
 // @Tags Аренда
-// @Param createRental body models.CreateRentalRequest true "Данные для создания новой команды"
+// @Param createRental body models.CreateRentalRequest true "Данные для создания новой аренды"
 // @Consumes application/json
 // @Produces application/json
 // @Success 201 {object} models.RentalView
@@ -246,8 +247,8 @@ func CreateRental() http.HandlerFunc {
 
 		if r.Method == http.MethodPost {
 			validation, rentalRequest := validateCreateRentalRequest(r)
-			if  validation != nil {
-				http.Error(w, validation.Error(), http.StatusBadRequest)
+			if validation != nil {
+				SendJSONError(w, http.StatusBadRequest, validation.Error())
 				return
 			}
 
@@ -258,14 +259,14 @@ func CreateRental() http.HandlerFunc {
 			layout := "2006-01-02 15:04:05"
 			startDate, errTime := time.Parse(layout, rentalRequest.StartDate)
 			if errTime != nil {
-				http.Error(w, errTime.Error(), http.StatusBadRequest)
+				SendJSONError(w, http.StatusBadRequest, errTime.Error())
 				return
 			}
 			rental.StartDate = startDate
 
 			endDate, errTime := time.Parse(layout, rentalRequest.EndDate)
 			if errTime != nil {
-				http.Error(w, errTime.Error(), http.StatusBadRequest)
+				SendJSONError(w, http.StatusBadRequest, errTime.Error())
 				return
 			}
 			rental.EndDate = endDate
@@ -295,7 +296,7 @@ func CreateRental() http.HandlerFunc {
 
 			errrental, rentalView := getOneRentalById(int64(rental.ID))
 			if errrental != nil {
-				http.Error(w, errrental.Error(), http.StatusBadRequest)
+				SendJSONError(w, http.StatusBadRequest, errrental.Error())
 				return
 			}
 			json.NewEncoder(w).Encode(rentalView)
@@ -304,15 +305,15 @@ func CreateRental() http.HandlerFunc {
 
 		// Если метод не поддерживается
 		w.Header().Set("Allow", "POST, OPTIONS")
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		SendJSONError(w, http.StatusMethodNotAllowed, "Method Not Allowed")
 	}
 }
 
 // Документация для метода Deleterental
-// @Summary Удаляет команду по ID
-// @Description Удаление команды по идентификатору
+// @Summary Удаляет аренду по ID
+// @Description Удаление аренды по идентификатору
 // @Tags Аренда
-// @Param id path int true "ID команды"
+// @Param id path int true "ID аренды"
 // @Success 204 No Content
 // @Failure 404 Not Found
 // @Router /api/rentals/{id} [delete]
@@ -335,5 +336,3 @@ func DeleteRental() http.HandlerFunc {
 		}
 	}
 }
-
-
