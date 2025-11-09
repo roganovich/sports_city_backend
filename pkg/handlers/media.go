@@ -35,6 +35,25 @@ func getOneMedia(fileName string) (error, models.Media) {
 	return err, media
 }
 
+// getMediaById получает информацию о медиафайле по его ID
+func getMediaById(id int64) (error, models.Media) {
+	var media models.Media
+	err := database.DB.QueryRow("SELECT * FROM medias WHERE id = $1", id).Scan(
+		&media.ID,
+		&media.Name,
+		&media.Path,
+		&media.Ext,
+		&media.Size,
+		&media.CreatedAt,
+	)
+
+	if err != nil {
+		log.Println("Ошибка в getMediaById", id, err.Error())
+	}
+
+	return err, media
+}
+
 // @Summary Загрузить медиафайл
 // @Description Загрузка медиафайла
 // @Tags Медиафайлы
@@ -69,7 +88,7 @@ func Preloader() http.HandlerFunc {
 			defer file.Close()
 
 			fileName := getRandomName()
-			dstPath := filepath.Join("./public/uploads/", fileName)
+			dstPath := filepath.Join("./public/upload/", fileName)
 
 			f, err := os.OpenFile(dstPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
 			if err != nil {

@@ -83,10 +83,10 @@ func main() {
 	router.HandleFunc("/api/rentals/{id}", handlers.AuthMiddleware(handlers.DeleteRental())).Methods("DELETE", "OPTIONS")
 
 	// Media
-	router.HandleFunc("/api/media/preloader", handlers.AuthMiddleware(handlers.Preloader())).Methods("POST", "OPTIONS")
+	router.HandleFunc("/api/media/preloader", handlers.Preloader()).Methods("POST", "OPTIONS")
 
 	// Адресса
-	router.HandleFunc("/api/address/suggest", handlers.AuthMiddleware(handlers.SuggestAddress())).Methods("POST", "OPTIONS")
+	router.HandleFunc("/api/address/suggests", handlers.SuggestAddress()).Methods("GET")
 
 	//start server
 	log.Fatal(http.ListenAndServe(":8000", handlers.JsonContentTypeMiddleware(router)))

@@ -1,17 +1,35 @@
 package dadata
 
 import (
-	"goland_api/pkg/models"
 	"bytes"
-	"log"
-	"os"
 	"encoding/json"
+	"goland_api/pkg/models"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
 )
+
+// DadataResponse represents the actual structure of Dadata API response
+type DadataResponse struct {
+	Suggestions []DadataSuggestion `json:"suggestions"`
+}
+
+// DadataSuggestion represents a single suggestion from Dadata API
+type DadataSuggestion struct {
+	Value string         `json:"value"`
+	Data  SuggestionData `json:"data"`
+}
+
+// SuggestionData contains detailed data about the suggestion
+type SuggestionData struct {
+	GeoLat string `json:"geo_lat"`
+	GeoLon string `json:"geo_lon"`
+}
 
 func Suggest(requestBody []byte) (models.AddressResponse, error) {
 	var addressResponse models.AddressResponse
+	var dadataResponse DadataResponse
 	apiKey := os.Getenv("DADATA_API_KEY")
 	apiURL := os.Getenv("DADATA_API_URL")
 
@@ -44,20 +62,26 @@ func Suggest(requestBody []byte) (models.AddressResponse, error) {
 
 	}
 
-	// Парсим ответ
-	err = json.Unmarshal(body, &addressResponse)
+	// Парсим ответ в промежуточную структуру
+	err = json.Unmarshal(body, &dadataResponse)
 	if err != nil {
 		log.Println("Ошибка при парсинге ответа:", err)
 		return addressResponse, err
 	}
 
+	// Преобразуем данные в нашу структуру
 	var suggestions []models.AddressSuggestion
-
-	// Выводим результаты
-	for _, suggestion := range addressResponse.Suggestions {
-		//log.Println(suggestion.Value)
-		suggestions = append(suggestions, suggestion)
+	for _, suggestion := range dadataResponse.Suggestions {
+		addressSuggestion := models.AddressSuggestion{
+			Value: suggestion.Value,
+			Geo: models.Geo{
+				Lat: suggestion.Data.GeoLat,
+				Lon: suggestion.Data.GeoLon,
+			},
+		}
+		suggestions = append(suggestions, addressSuggestion)
 	}
+
 	addressResponse.Suggestions = suggestions
 
 	return addressResponse, nil

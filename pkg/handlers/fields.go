@@ -2,65 +2,20 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"goland_api/pkg/database"
 	"goland_api/pkg/models"
+	"goland_api/pkg/utils"
 	"log"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/go-playground/validator"
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 )
-
-// generateSlug создает URL-дружественный slug из переменного количества строк
-// Использование: generateSlug("строка1", "строка2", ...) или generateSlug(однаСтрока)
-// Пример: generateSlug("Футбольное", "Поле") возвращает "futbolnoe-pole"
-func generateSlug(texts ...string) string {
-	// Concatenate all input strings with spaces
-	concatenated := strings.Join(texts, " ")
-
-	// Convert to lowercase
-	slug := strings.ToLower(concatenated)
-
-	// Transliterate common Cyrillic characters to Latin
-	cyrillicToLatin := map[rune]string{
-		'а': "a", 'б': "b", 'в': "v", 'г': "g", 'д': "d", 'е': "e", 'ё': "e", 'ж': "zh", 'з': "z",
-		'и': "i", 'й': "y", 'к': "k", 'л': "l", 'м': "m", 'н': "n", 'о': "o", 'п': "p", 'р': "r",
-		'с': "s", 'т': "t", 'у': "u", 'ф': "f", 'х': "h", 'ц': "ts", 'ч': "ch", 'ш': "sh", 'щ': "sch",
-		'ъ': "", 'ы': "y", 'ь': "", 'э': "e", 'ю': "yu", 'я': "ya",
-		'А': "A", 'Б': "B", 'В': "V", 'Г': "G", 'Д': "D", 'Е': "E", 'Ё': "E", 'Ж': "Zh", 'З': "Z",
-		'И': "I", 'Й': "Y", 'К': "K", 'Л': "L", 'М': "M", 'Н': "N", 'О': "O", 'П': "P", 'Р': "R",
-		'С': "S", 'Т': "T", 'У': "U", 'Ф': "F", 'Х': "H", 'Ц': "Ts", 'Ч': "Ch", 'Ш': "Sh", 'Щ': "Sch",
-		'Ъ': "", 'Ы': "Y", 'Ь': "", 'Э': "E", 'Ю': "Yu", 'Я': "Ya",
-	}
-
-	var transliterated strings.Builder
-	for _, r := range slug {
-		if replacement, exists := cyrillicToLatin[r]; exists {
-			transliterated.WriteString(replacement)
-		} else {
-			transliterated.WriteRune(r)
-		}
-	}
-	slug = transliterated.String()
-
-	// Replace spaces and special characters with hyphens
-	reg := regexp.MustCompile("[^a-z0-9\\-]+")
-	slug = reg.ReplaceAllString(slug, "_")
-
-	// Remove leading and trailing hyphens
-	slug = strings.Trim(slug, "-")
-
-	// Replace multiple consecutive hyphens with a single hyphen
-	reg = regexp.MustCompile("-+")
-	slug = reg.ReplaceAllString(slug, "-")
-
-	return slug
-}
 
 // GetFields возвращает функцию-обработчик, которая получает все площадки из базы данных.
 // Выполняет запрос к базе данных для получения всех площадок и возвращает их в виде JSON-ответа.
@@ -302,7 +257,7 @@ func validateCreateFieldRequest(r *http.Request) (error, models.CreateFieldReque
 	// Generate slug if not provided
 	slug := req.Slug
 	if slug == "" {
-		slug = generateSlug(req.Name)
+		slug = utils.GenerateSlug(req.Name)
 	}
 
 	// Проверка на дубли по полю slug
@@ -316,6 +271,198 @@ func validateCreateFieldRequest(r *http.Request) (error, models.CreateFieldReque
 	}
 
 	return nil, req
+}
+
+// processFieldBinaryData обрабатывает бинарные данные для логотипа и медиафайлов
+// и возвращает пути к файлам
+func processFieldBinaryDataCreate(req *models.CreateFieldRequest) (string, string, error) {
+	var logoPath string
+	var mediaPaths []string
+
+	if req.Logo != nil && len(*req.Logo) > 0 {
+		// Process logo data from Logo field (base64 string)
+		var logoBytes []byte
+		var err error
+
+		// Check if it's a base64 data URL
+		if strings.HasPrefix(*req.Logo, "data:") {
+			// Extract base64 data from data URL
+			parts := strings.SplitN(*req.Logo, ",", 2)
+			if len(parts) == 2 {
+				logoBytes, err = base64.StdEncoding.DecodeString(parts[1])
+				if err != nil {
+					return "", "", fmt.Errorf("failed to decode base64 logo data: %v", err)
+				}
+			} else {
+				return "", "", fmt.Errorf("invalid base64 logo data format")
+			}
+		} else {
+			// Try to decode as base64 string directly
+			logoBytes, err = base64.StdEncoding.DecodeString(*req.Logo)
+			if err != nil {
+				return "", "", fmt.Errorf("failed to decode base64 logo data: %v", err)
+			}
+		}
+
+		path, err := utils.SaveFileFromBytes(logoBytes, "logo")
+		if err != nil {
+			return "", "", fmt.Errorf("failed to save logo: %v", err)
+		}
+		logoPath = path
+	}
+
+	// Process media array data
+	if req.Media != nil && len(*req.Media) > 0 {
+		// Parse the JSON array of base64 strings
+		var mediaArray []string
+		if err := json.Unmarshal(*req.Media, &mediaArray); err != nil {
+			return "", "", fmt.Errorf("failed to parse media array: %v", err)
+		}
+
+		// Process each media item
+		for i, mediaData := range mediaArray {
+			if mediaData != "" {
+				// Process media data from Media field (base64 string)
+				var mediaBytes []byte
+				var err error
+
+				// Check if it's a base64 data URL
+				if strings.HasPrefix(mediaData, "data:") {
+					// Extract base64 data from data URL
+					parts := strings.SplitN(mediaData, ",", 2)
+					if len(parts) == 2 {
+						mediaBytes, err = base64.StdEncoding.DecodeString(parts[1])
+						if err != nil {
+							return "", "", fmt.Errorf("failed to decode base64 media data for item %d: %v", i, err)
+						}
+					} else {
+						return "", "", fmt.Errorf("invalid base64 media data format for item %d", i)
+					}
+				} else {
+					// Try to decode as base64 string directly
+					mediaBytes, err = base64.StdEncoding.DecodeString(mediaData)
+					if err != nil {
+						return "", "", fmt.Errorf("failed to decode base64 media data for item %d: %v", i, err)
+					}
+				}
+
+				filename := fmt.Sprintf("media_%d", i)
+				path, err := utils.SaveFileFromBytes(mediaBytes, filename)
+				if err != nil {
+					return "", "", fmt.Errorf("failed to save media item %d: %v", i, err)
+				}
+				mediaPaths = append(mediaPaths, path)
+			}
+		}
+	}
+
+	// Convert media paths to JSON array
+	var mediaJSON string
+	if len(mediaPaths) > 0 {
+		mediaBytes, err := json.Marshal(mediaPaths)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to marshal media paths: %v", err)
+		}
+		mediaJSON = string(mediaBytes)
+	}
+
+	return logoPath, mediaJSON, nil
+}
+
+// processFieldBinaryDataUpdate обрабатывает бинарные данные для логотипа и медиафайлов
+// и возвращает пути к файлам для запросов на обновление
+func processFieldBinaryDataUpdate(req *models.UpdateFieldRequest) (string, string, error) {
+	var logoPath string
+	var mediaPaths []string
+
+	if req.Logo != nil && len(*req.Logo) > 0 {
+		// Process logo data from Logo field (base64 string)
+		var logoBytes []byte
+		var err error
+
+		// Check if it's a base64 data URL
+		if strings.HasPrefix(*req.Logo, "data:") {
+			// Extract base64 data from data URL
+			parts := strings.SplitN(*req.Logo, ",", 2)
+			if len(parts) == 2 {
+				logoBytes, err = base64.StdEncoding.DecodeString(parts[1])
+				if err != nil {
+					return "", "", fmt.Errorf("failed to decode base64 logo data: %v", err)
+				}
+			} else {
+				return "", "", fmt.Errorf("invalid base64 logo data format")
+			}
+		} else {
+			// Try to decode as base64 string directly
+			logoBytes, err = base64.StdEncoding.DecodeString(*req.Logo)
+			if err != nil {
+				return "", "", fmt.Errorf("failed to decode base64 logo data: %v", err)
+			}
+		}
+
+		path, err := utils.SaveFileFromBytes(logoBytes, "logo")
+		if err != nil {
+			return "", "", fmt.Errorf("failed to save logo: %v", err)
+		}
+		logoPath = path
+	}
+
+	// Process media array data
+	if req.Media != nil && len(*req.Media) > 0 {
+		// Parse the JSON array of base64 strings
+		var mediaArray []string
+		if err := json.Unmarshal(*req.Media, &mediaArray); err != nil {
+			return "", "", fmt.Errorf("failed to parse media array: %v", err)
+		}
+
+		// Process each media item
+		for i, mediaData := range mediaArray {
+			if mediaData != "" {
+				// Process media data from Media field (base64 string)
+				var mediaBytes []byte
+				var err error
+
+				// Check if it's a base64 data URL
+				if strings.HasPrefix(mediaData, "data:") {
+					// Extract base64 data from data URL
+					parts := strings.SplitN(mediaData, ",", 2)
+					if len(parts) == 2 {
+						mediaBytes, err = base64.StdEncoding.DecodeString(parts[1])
+						if err != nil {
+							return "", "", fmt.Errorf("failed to decode base64 media data for item %d: %v", i, err)
+						}
+					} else {
+						return "", "", fmt.Errorf("invalid base64 media data format for item %d", i)
+					}
+				} else {
+					// Try to decode as base64 string directly
+					mediaBytes, err = base64.StdEncoding.DecodeString(mediaData)
+					if err != nil {
+						return "", "", fmt.Errorf("failed to decode base64 media data for item %d: %v", i, err)
+					}
+				}
+
+				filename := fmt.Sprintf("media_%d", i)
+				path, err := utils.SaveFileFromBytes(mediaBytes, filename)
+				if err != nil {
+					return "", "", fmt.Errorf("failed to save media item %d: %v", i, err)
+				}
+				mediaPaths = append(mediaPaths, path)
+			}
+		}
+	}
+
+	// Convert media paths to JSON array
+	var mediaJSON string
+	if len(mediaPaths) > 0 {
+		mediaBytes, err := json.Marshal(mediaPaths)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to marshal media paths: %v", err)
+		}
+		mediaJSON = string(mediaBytes)
+	}
+
+	return logoPath, mediaJSON, nil
 }
 
 // validateUpdatedAtFieldRequest проверяет данные для обновления площадки.
@@ -365,20 +512,29 @@ func CreateField() http.HandlerFunc {
 				return
 			}
 
+			// Instead of processing binary data, we now directly use logo ID and media IDs
+			// logo will contain an ID from the medias table
+			// media will contain an array of IDs from the medias table
 			var field models.Field
 			field.Name = fieldRequest.Name
 			// Generate slug from name if not provided
 			if fieldRequest.Slug == "" {
-				field.Slug = generateSlug(fieldRequest.City, fieldRequest.Name)
+				field.Slug = utils.GenerateSlug(fieldRequest.City, fieldRequest.Name)
 			} else {
 				field.Slug = fieldRequest.Slug
 			}
 			field.Description = fieldRequest.Description
 			field.City = fieldRequest.City
 			field.Address = fieldRequest.Address
+
+			// Use logo ID directly
 			field.Logo = fieldRequest.Logo
+
+			// Use media IDs directly
 			field.Media = fieldRequest.Media
-			err := database.DB.QueryRow("INSERT INTO fields (name, slug, description, city, address, logo, media) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+
+			var err error
+			err = database.DB.QueryRow("INSERT INTO fields (name, slug, description, city, address, logo, media) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
 				field.Name,
 				field.Slug,
 				field.Description,
@@ -389,6 +545,8 @@ func CreateField() http.HandlerFunc {
 			).Scan(&field.ID)
 			if err != nil {
 				log.Println(err)
+				SendJSONError(w, http.StatusInternalServerError, "Failed to create field")
+				return
 			}
 
 			errField, fieldView := getOneFieldById(int64(field.ID))
@@ -439,18 +597,26 @@ func UpdateField() http.HandlerFunc {
 				SendJSONError(w, http.StatusBadRequest, validation.Error())
 				return
 			}
+
+			// Instead of processing binary data, we now directly use logo ID and media IDs
+			// logo will contain an ID from the medias table
+			// media will contain an array of IDs from the medias table
 			var field models.Field
 			field.Name = fieldRequest.Name
 			// Generate slug from name if not provided
 			if fieldRequest.Slug == "" {
-				field.Slug = generateSlug(fieldRequest.Name)
+				field.Slug = utils.GenerateSlug(fieldRequest.Name)
 			} else {
 				field.Slug = fieldRequest.Slug
 			}
 			field.Description = fieldRequest.Description
 			field.City = fieldRequest.City
 			field.Address = fieldRequest.Address
+
+			// Use logo ID directly
 			field.Logo = fieldRequest.Logo
+
+			// Use media IDs directly
 			field.Media = fieldRequest.Media
 
 			vars := mux.Vars(r)
@@ -469,6 +635,7 @@ func UpdateField() http.HandlerFunc {
 			if errUpdate != nil {
 				log.Println(errUpdate)
 				SendJSONError(w, http.StatusBadRequest, errUpdate.Error())
+				return
 			}
 
 			errorResponse, fieldView = getOneFieldBySlug(slug)
