@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"goland_api/pkg/database"
 	"goland_api/pkg/models"
 	"io"
@@ -11,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/gorilla/mux"
 
 	"github.com/google/uuid"
 )
@@ -52,6 +55,64 @@ func getMediaById(id int64) (error, models.Media) {
 	}
 
 	return err, media
+}
+
+// @Summary Открыть медиафайл
+// @Description Открытие медиафайла
+// @Tags Медиафайлы
+// @Param file formData file true "Загруженный файл"
+// @Success 200 {object} models.Media
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 413 {object} models.ErrorResponse
+// @Failure 415 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /api/media/{file} [get]
+func View() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		file := vars["file"]
+
+		errorResponse, media := getOneMedia(file)
+		if errorResponse != nil {
+			SendJSONError(w, http.StatusBadRequest, errorResponse.Error())
+			return
+		}
+
+		if errorResponse != nil {
+			SendJSONError(w, http.StatusBadRequest, errorResponse.Error())
+			return
+		}
+
+		// Проверяем существование файла
+		if _, err := os.Stat(media.Path); os.IsNotExist(err) {
+			SendJSONError(w, http.StatusNotFound, "File not found")
+			return
+		}
+
+		// Открываем файл
+		fileData, err := os.Open(media.Path)
+		if err != nil {
+			SendJSONError(w, http.StatusInternalServerError, "Cannot open file")
+			return
+		}
+		defer fileData.Close()
+
+		// Получаем информацию о файле
+		fileInfo, err := fileData.Stat()
+		if err != nil {
+			SendJSONError(w, http.StatusInternalServerError, "Cannot get file info")
+			return
+		}
+
+		// Устанавливаем правильные заголовки для отображения в браузере
+		contentType := getContentType(media.Ext)
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
+		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", media.Name+"."+media.Ext))
+
+		// Копируем содержимое файла в response writer
+		http.ServeContent(w, r, media.Name+"."+media.Ext, fileInfo.ModTime(), fileData)
+	}
 }
 
 // @Summary Загрузить медиафайл
@@ -147,4 +208,32 @@ func getMIMEType(filename string) string {
 	}
 
 	return ext
+}
+
+// Вспомогательная функция для определения Content-Type
+func getContentType(ext string) string {
+	switch strings.ToLower(ext) {
+	case "jpg", "jpeg":
+		return "image/jpeg"
+	case "png":
+		return "image/png"
+	case "gif":
+		return "image/gif"
+	case "pdf":
+		return "application/pdf"
+	case "txt":
+		return "text/plain"
+	case "html":
+		return "text/html"
+	case "css":
+		return "text/css"
+	case "js":
+		return "application/javascript"
+	case "json":
+		return "application/json"
+	case "xml":
+		return "application/xml"
+	default:
+		return "application/octet-stream"
+	}
 }

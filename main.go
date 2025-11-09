@@ -84,6 +84,7 @@ func main() {
 
 	// Media
 	router.HandleFunc("/api/media/preloader", handlers.Preloader()).Methods("POST", "OPTIONS")
+	router.HandleFunc("/api/media/{file}", handlers.View()).Methods("GET")
 
 	// Адресса
 	router.HandleFunc("/api/address/suggests", handlers.SuggestAddress()).Methods("GET")
