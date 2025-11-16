@@ -73,7 +73,7 @@ docker images
 migrate create -ext sql -dir db/migration -seq update_field_metia_logo
 ```
 ```bash
-/home/roman/go/bin/migrate create -ext sql -dir db/migration -seq add_slug_to_fields
+/home/roman/go/bin/migrate create -ext sql -dir db/migration -seq add_owner_to_fields
 ```
 #### Выполнить
 ```bash
