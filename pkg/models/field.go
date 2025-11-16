@@ -23,6 +23,7 @@ type Field struct {
 	ForDisabled bool             `json:"for_disabled"`
 	Logo        *string          `json:"logo"`
 	Media       *json.RawMessage `json:"media"`
+	Responsible UserView         `json:"responsible"` // Ответственный
 	Status      *int             `json:"status"`
 	CreatedAt   time.Time        `json:"created_at"`
 	UpdatedAt   time.Time        `json:"updated_at"`
@@ -45,8 +46,9 @@ type FieldView struct {
 	Display     bool             `json:"display"`
 	Parking     bool             `json:"parking"`
 	ForDisabled bool             `json:"for_disabled"`
-	Logo        *Media           `json:"logo"`  // Логотип
-	Media       *[]Media         `json:"media"` // Медиа
+	Logo        *Media           `json:"logo"`        // Логотип
+	Media       *[]Media         `json:"media"`       // Медиа
+	Responsible UserView         `json:"responsible"` // Ответственный
 	Status      *int             `json:"status"`
 	CreatedAt   time.Time        `json:"created_at"`
 }
@@ -68,6 +70,7 @@ type CreateFieldRequest struct {
 	ForDisabled bool             `json:"for_disabled"`
 	Logo        *string          `json:"logo"`
 	Media       *json.RawMessage `json:"media" swaggertype:"string"`
+	Responsible UserView         `json:"responsible"` // Ответственный
 }
 
 type UpdateFieldRequest struct {
@@ -87,4 +90,5 @@ type UpdateFieldRequest struct {
 	ForDisabled bool             `json:"for_disabled"`
 	Logo        *string          `json:"logo"`
 	Media       *json.RawMessage `json:"media" swaggertype:"string"`
+	Responsible UserView         `json:"responsible"` // Ответственный
 }

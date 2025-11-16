@@ -42,11 +42,11 @@ func GenerateSlug(texts ...string) string {
 	slug = reg.ReplaceAllString(slug, "_")
 
 	// Remove leading and trailing hyphens
-	slug = strings.Trim(slug, "-")
+	slug = strings.Trim(slug, "_")
 
 	// Replace multiple consecutive hyphens with a single hyphen
 	reg = regexp.MustCompile("-+")
-	slug = reg.ReplaceAllString(slug, "-")
+	slug = reg.ReplaceAllString(slug, "_")
 
 	return slug
 }

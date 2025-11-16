@@ -88,7 +88,7 @@ func getUserViewById(paramId int64) (error, models.UserView) {
 			"r.id, r.name "+
 			"FROM users u "+
 			"join roles r on r.id = u.role_id "+
-			"WHERE email = $1", paramId).Scan(
+			"WHERE u.id = $1", paramId).Scan(
 		&userView.ID,
 		&userView.Name,
 		&userView.Email,

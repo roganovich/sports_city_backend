@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"goland_api/pkg/models"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 
 	ut "github.com/go-playground/universal-translator"
@@ -80,6 +82,26 @@ func AuthAdminMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	})
 }
 
+/**
+* Функция проверяет, что пользователь является клиентов
+ */
+func IsUser(auth models.UserView) bool {
+	if _, exists := UserRoles[auth.Role.ID]; !exists {
+		return false
+	}
+	return true
+}
+
+/**
+* Функция проверяет, что пользователь является админом
+ */
+func IsAdmin(auth models.UserView) bool {
+	if _, exists := AdminRoles[auth.Role.ID]; !exists {
+		return false
+	}
+	return true
+}
+
 // Middleware для обработки CORS
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -131,45 +153,6 @@ var (
 	trans    ut.Translator
 )
 
-func registerCustomErrorMessages() {
-	// Кастомные сообщения для стандартных тегов
-	validate.RegisterTranslation("required", trans, func(ut ut.Translator) error {
-		return ut.Add("required", "{0} является обязательным полем", true)
-	}, func(ut ut.Translator, fe validator.FieldError) string {
-		t, _ := ut.T("required", fe.Field())
-		return t
-	})
-
-	validate.RegisterTranslation("min", trans, func(ut ut.Translator) error {
-		return ut.Add("min", "{0} должен быть не менее {1} символов", true)
-	}, func(ut ut.Translator, fe validator.FieldError) string {
-		t, _ := ut.T("min", fe.Field(), fe.Param())
-		return t
-	})
-
-	validate.RegisterTranslation("max", trans, func(ut ut.Translator) error {
-		return ut.Add("max", "{0} должен быть не более {1} символов", true)
-	}, func(ut ut.Translator, fe validator.FieldError) string {
-		t, _ := ut.T("max", fe.Field(), fe.Param())
-		return t
-	})
-
-	validate.RegisterTranslation("email", trans, func(ut ut.Translator) error {
-		return ut.Add("email", "{0} должен быть корректным email-адресом", true)
-	}, func(ut ut.Translator, fe validator.FieldError) string {
-		t, _ := ut.T("email", fe.Field())
-		return t
-	})
-
-	// Кастомные сообщения для пользовательских тегов
-	validate.RegisterTranslation("phone", trans, func(ut ut.Translator) error {
-		return ut.Add("phone", "{0} должен быть корректным номером телефона", true)
-	}, func(ut ut.Translator, fe validator.FieldError) string {
-		t, _ := ut.T("phone", fe.Field())
-		return t
-	})
-}
-
 func getIntParam(params url.Values, key string, defaultValue int) int {
 	value := params.Get(key) // Получаем значение параметра
 	if value == "" {
@@ -182,4 +165,17 @@ func getIntParam(params url.Values, key string, defaultValue int) int {
 	}
 
 	return result
+}
+
+// varDump will print out any number of variables given to it
+// e.g. varDump("test", 1234)
+func varDump(myVar ...interface{}) {
+	fmt.Printf("%v\n", myVar)
+}
+
+// dd will print out variables given to it (like varDump()) but
+// will also stop execution from continuing.
+func dd(myVar ...interface{}) {
+	varDump(myVar...)
+	os.Exit(1)
 }

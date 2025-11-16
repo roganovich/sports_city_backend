@@ -72,8 +72,8 @@ func main() {
 	// Площадки
 	router.HandleFunc("/api/fields", handlers.GetFields()).Methods("GET")
 	router.HandleFunc("/api/fields/{slug}", handlers.GetField()).Methods("GET")
-	router.HandleFunc("/api/fields", handlers.AuthAdminMiddleware(handlers.CreateField())).Methods("POST", "OPTIONS")
-	router.HandleFunc("/api/fields/{slug}", handlers.AuthAdminMiddleware(handlers.UpdateField())).Methods("PUT", "OPTIONS")
+	router.HandleFunc("/api/fields", handlers.AuthMiddleware(handlers.CreateField())).Methods("POST", "OPTIONS")
+	router.HandleFunc("/api/fields/{slug}", handlers.AuthMiddleware(handlers.UpdateField())).Methods("PUT", "OPTIONS")
 	router.HandleFunc("/api/fields/{slug}", handlers.AuthAdminMiddleware(handlers.DeleteField())).Methods("DELETE", "OPTIONS")
 
 	// Аренда

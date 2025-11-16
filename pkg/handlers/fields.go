@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"goland_api/pkg/database"
@@ -10,7 +9,6 @@ import (
 	"goland_api/pkg/utils"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/go-playground/validator"
 	"github.com/gorilla/mux"
@@ -31,7 +29,11 @@ import (
 // @Router /api/fields [get]
 func GetFields() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := database.DB.Query("SELECT id, name, slug, description, city, address, logo, media, status, created_at  FROM fields")
+		var rows *sql.Rows
+		var err error
+
+		rows, err = database.DB.Query("SELECT id, name, slug, description, city, address, logo, media, responsible_id, status, created_at FROM fields")
+
 		if err != nil {
 			log.Println("Ошибка в SQL запросе GetFields", err)
 		}
@@ -42,6 +44,8 @@ func GetFields() http.HandlerFunc {
 			var logo sql.NullString
 			var media sql.NullString
 
+			// Add a temporary variable to hold the responsible_id
+			var responsibleID sql.NullInt64
 			if err := rows.Scan(
 				&fieldView.ID,
 				&fieldView.Name,
@@ -51,10 +55,21 @@ func GetFields() http.HandlerFunc {
 				&fieldView.Address,
 				&logo,
 				&media,
+				&responsibleID,
 				&fieldView.Status,
 				&fieldView.CreatedAt,
 			); err != nil {
 				log.Println("Ошибка в Scan", err)
+			}
+
+			// Fetch the responsible user data if responsible_id is not null
+			if responsibleID.Valid {
+				errorResponse, userView := getUserViewById(int64(responsibleID.Int64))
+				if errorResponse != nil {
+					log.Println("Ошибка при получении данных ответственного пользователя", errorResponse.Error())
+				} else {
+					fieldView.Responsible = userView
+				}
 			}
 
 			if logo.Valid {
@@ -105,7 +120,9 @@ func getOneFieldById(paramId int64) (error, models.FieldView) {
 	var logo sql.NullString
 	var media sql.NullString
 
-	err := database.DB.QueryRow("SELECT id, name, slug, description, city, address, logo, media, status, created_at FROM fields WHERE id = $1", int64(paramId)).Scan(
+	// Add a temporary variable to hold the responsible_id
+	var responsibleID sql.NullInt64
+	err := database.DB.QueryRow("SELECT id, name, slug, description, city, address, logo, media, responsible_id, status, created_at FROM fields WHERE id = $1", int64(paramId)).Scan(
 		&fieldView.ID,
 		&fieldView.Name,
 		&fieldView.Slug,
@@ -114,9 +131,20 @@ func getOneFieldById(paramId int64) (error, models.FieldView) {
 		&fieldView.Address,
 		&logo,
 		&media,
+		&responsibleID,
 		&fieldView.Status,
 		&fieldView.CreatedAt,
 	)
+
+	// Fetch the responsible user data if responsible_id is not null
+	if responsibleID.Valid {
+		errorResponse, userView := getUserViewById(int64(responsibleID.Int64))
+		if errorResponse != nil {
+			log.Println("Ошибка при получении данных ответственного пользователя", errorResponse.Error())
+		} else {
+			fieldView.Responsible = userView
+		}
+	}
 	if err != nil {
 		return err, fieldView
 	}
@@ -158,7 +186,9 @@ func getOneFieldBySlug(slug string) (error, models.FieldView) {
 	var logo sql.NullString
 	var media sql.NullString
 
-	err := database.DB.QueryRow("SELECT id, name, slug, description, city, address, logo, media, status, created_at FROM fields WHERE slug = $1", slug).Scan(
+	// Add a temporary variable to hold the responsible_id
+	var responsibleID sql.NullInt64
+	err := database.DB.QueryRow("SELECT id, name, slug, description, city, address, logo, media, responsible_id, status, created_at FROM fields WHERE slug = $1", slug).Scan(
 		&fieldView.ID,
 		&fieldView.Name,
 		&fieldView.Slug,
@@ -167,9 +197,20 @@ func getOneFieldBySlug(slug string) (error, models.FieldView) {
 		&fieldView.Address,
 		&logo,
 		&media,
+		&responsibleID,
 		&fieldView.Status,
 		&fieldView.CreatedAt,
 	)
+
+	// Fetch the responsible user data if responsible_id is not null
+	if responsibleID.Valid {
+		errorResponse, userView := getUserViewById(int64(responsibleID.Int64))
+		if errorResponse != nil {
+			log.Println("Ошибка при получении данных ответственного пользователя", errorResponse.Error())
+		} else {
+			fieldView.Responsible = userView
+		}
+	}
 	if err != nil {
 		return err, fieldView
 	}
@@ -273,207 +314,60 @@ func validateCreateFieldRequest(r *http.Request) (error, models.CreateFieldReque
 	return nil, req
 }
 
-// processFieldBinaryData обрабатывает бинарные данные для логотипа и медиафайлов
-// и возвращает пути к файлам
-func processFieldBinaryDataCreate(req *models.CreateFieldRequest) (string, string, error) {
-	var logoPath string
-	var mediaPaths []string
-
-	if req.Logo != nil && len(*req.Logo) > 0 {
-		// Process logo data from Logo field (base64 string)
-		var logoBytes []byte
-		var err error
-
-		// Check if it's a base64 data URL
-		if strings.HasPrefix(*req.Logo, "data:") {
-			// Extract base64 data from data URL
-			parts := strings.SplitN(*req.Logo, ",", 2)
-			if len(parts) == 2 {
-				logoBytes, err = base64.StdEncoding.DecodeString(parts[1])
-				if err != nil {
-					return "", "", fmt.Errorf("failed to decode base64 logo data: %v", err)
-				}
-			} else {
-				return "", "", fmt.Errorf("invalid base64 logo data format")
-			}
-		} else {
-			// Try to decode as base64 string directly
-			logoBytes, err = base64.StdEncoding.DecodeString(*req.Logo)
-			if err != nil {
-				return "", "", fmt.Errorf("failed to decode base64 logo data: %v", err)
-			}
-		}
-
-		path, err := utils.SaveFileFromBytes(logoBytes, "logo")
-		if err != nil {
-			return "", "", fmt.Errorf("failed to save logo: %v", err)
-		}
-		logoPath = path
-	}
-
-	// Process media array data
-	if req.Media != nil && len(*req.Media) > 0 {
-		// Parse the JSON array of base64 strings
-		var mediaArray []string
-		if err := json.Unmarshal(*req.Media, &mediaArray); err != nil {
-			return "", "", fmt.Errorf("failed to parse media array: %v", err)
-		}
-
-		// Process each media item
-		for i, mediaData := range mediaArray {
-			if mediaData != "" {
-				// Process media data from Media field (base64 string)
-				var mediaBytes []byte
-				var err error
-
-				// Check if it's a base64 data URL
-				if strings.HasPrefix(mediaData, "data:") {
-					// Extract base64 data from data URL
-					parts := strings.SplitN(mediaData, ",", 2)
-					if len(parts) == 2 {
-						mediaBytes, err = base64.StdEncoding.DecodeString(parts[1])
-						if err != nil {
-							return "", "", fmt.Errorf("failed to decode base64 media data for item %d: %v", i, err)
-						}
-					} else {
-						return "", "", fmt.Errorf("invalid base64 media data format for item %d", i)
-					}
-				} else {
-					// Try to decode as base64 string directly
-					mediaBytes, err = base64.StdEncoding.DecodeString(mediaData)
-					if err != nil {
-						return "", "", fmt.Errorf("failed to decode base64 media data for item %d: %v", i, err)
-					}
-				}
-
-				filename := fmt.Sprintf("media_%d", i)
-				path, err := utils.SaveFileFromBytes(mediaBytes, filename)
-				if err != nil {
-					return "", "", fmt.Errorf("failed to save media item %d: %v", i, err)
-				}
-				mediaPaths = append(mediaPaths, path)
-			}
-		}
-	}
-
-	// Convert media paths to JSON array
-	var mediaJSON string
-	if len(mediaPaths) > 0 {
-		mediaBytes, err := json.Marshal(mediaPaths)
-		if err != nil {
-			return "", "", fmt.Errorf("failed to marshal media paths: %v", err)
-		}
-		mediaJSON = string(mediaBytes)
-	}
-
-	return logoPath, mediaJSON, nil
-}
-
-// processFieldBinaryDataUpdate обрабатывает бинарные данные для логотипа и медиафайлов
-// и возвращает пути к файлам для запросов на обновление
-func processFieldBinaryDataUpdate(req *models.UpdateFieldRequest) (string, string, error) {
-	var logoPath string
-	var mediaPaths []string
-
-	if req.Logo != nil && len(*req.Logo) > 0 {
-		// Process logo data from Logo field (base64 string)
-		var logoBytes []byte
-		var err error
-
-		// Check if it's a base64 data URL
-		if strings.HasPrefix(*req.Logo, "data:") {
-			// Extract base64 data from data URL
-			parts := strings.SplitN(*req.Logo, ",", 2)
-			if len(parts) == 2 {
-				logoBytes, err = base64.StdEncoding.DecodeString(parts[1])
-				if err != nil {
-					return "", "", fmt.Errorf("failed to decode base64 logo data: %v", err)
-				}
-			} else {
-				return "", "", fmt.Errorf("invalid base64 logo data format")
-			}
-		} else {
-			// Try to decode as base64 string directly
-			logoBytes, err = base64.StdEncoding.DecodeString(*req.Logo)
-			if err != nil {
-				return "", "", fmt.Errorf("failed to decode base64 logo data: %v", err)
-			}
-		}
-
-		path, err := utils.SaveFileFromBytes(logoBytes, "logo")
-		if err != nil {
-			return "", "", fmt.Errorf("failed to save logo: %v", err)
-		}
-		logoPath = path
-	}
-
-	// Process media array data
-	if req.Media != nil && len(*req.Media) > 0 {
-		// Parse the JSON array of base64 strings
-		var mediaArray []string
-		if err := json.Unmarshal(*req.Media, &mediaArray); err != nil {
-			return "", "", fmt.Errorf("failed to parse media array: %v", err)
-		}
-
-		// Process each media item
-		for i, mediaData := range mediaArray {
-			if mediaData != "" {
-				// Process media data from Media field (base64 string)
-				var mediaBytes []byte
-				var err error
-
-				// Check if it's a base64 data URL
-				if strings.HasPrefix(mediaData, "data:") {
-					// Extract base64 data from data URL
-					parts := strings.SplitN(mediaData, ",", 2)
-					if len(parts) == 2 {
-						mediaBytes, err = base64.StdEncoding.DecodeString(parts[1])
-						if err != nil {
-							return "", "", fmt.Errorf("failed to decode base64 media data for item %d: %v", i, err)
-						}
-					} else {
-						return "", "", fmt.Errorf("invalid base64 media data format for item %d", i)
-					}
-				} else {
-					// Try to decode as base64 string directly
-					mediaBytes, err = base64.StdEncoding.DecodeString(mediaData)
-					if err != nil {
-						return "", "", fmt.Errorf("failed to decode base64 media data for item %d: %v", i, err)
-					}
-				}
-
-				filename := fmt.Sprintf("media_%d", i)
-				path, err := utils.SaveFileFromBytes(mediaBytes, filename)
-				if err != nil {
-					return "", "", fmt.Errorf("failed to save media item %d: %v", i, err)
-				}
-				mediaPaths = append(mediaPaths, path)
-			}
-		}
-	}
-
-	// Convert media paths to JSON array
-	var mediaJSON string
-	if len(mediaPaths) > 0 {
-		mediaBytes, err := json.Marshal(mediaPaths)
-		if err != nil {
-			return "", "", fmt.Errorf("failed to marshal media paths: %v", err)
-		}
-		mediaJSON = string(mediaBytes)
-	}
-
-	return logoPath, mediaJSON, nil
-}
-
 // validateUpdatedAtFieldRequest проверяет данные для обновления площадки.
 // Декодирует тело JSON-запроса и проверяет данные обновления площадки с помощью структурной валидации.
-func validateUpdatedAtFieldRequest(r *http.Request) (error, models.UpdateFieldRequest) {
+func validateUpdatedAtFieldRequest(r *http.Request, fieldView models.FieldView) (error, models.UpdateFieldRequest) {
 	var req models.UpdateFieldRequest
 	if validation := json.NewDecoder(r.Body).Decode(&req); validation != nil {
 		return validation, req
 	}
 	validate := validator.New()
 	if validation := validate.Struct(req); validation != nil {
+		return validation, req
+	}
+
+	if req.Name != fieldView.Name || req.City != fieldView.City {
+		// Проверка на дубли по полям name и city
+		var count int
+		err := database.DB.QueryRow("SELECT COUNT(*) FROM fields WHERE name = $1 AND city = $2", req.Name, req.City).Scan(&count)
+		if err != nil {
+			return err, req
+		}
+		if count > 0 {
+			validation := fmt.Errorf("Площадка с именем '%s' из города '%s' уже существует", req.Name, req.City)
+			return validation, req
+		}
+	}
+
+	// Generate slug if not provided
+	slug := req.Slug
+	if slug == "" {
+		slug = utils.GenerateSlug(req.City, req.Name)
+	}
+
+	if slug != fieldView.Slug {
+		var count int
+		// Проверка на дубли по полю slug
+		err := database.DB.QueryRow("SELECT COUNT(*) FROM fields WHERE slug = $1", slug).Scan(&count)
+		if err != nil {
+			return err, req
+		}
+		if count > 0 {
+			validation := fmt.Errorf("Площадка с slug '%s' уже существует", slug)
+			return validation, req
+		}
+	}
+	// Проверка на право редактирования
+	if IsAdmin(*AUTH) {
+		// Admins can edit any field
+	} else if IsUser(*AUTH) {
+		// Users can only edit fields where they are the responsible person
+		if fieldView.Responsible.ID != AUTH.ID {
+			validation := fmt.Errorf("Пользователь не имеет прав на редактирование этой площадки")
+			return validation, req
+		}
+	} else {
+		validation := fmt.Errorf("Пользователь не имеет прав на редактирование площадок")
 		return validation, req
 	}
 
@@ -517,6 +411,7 @@ func CreateField() http.HandlerFunc {
 			// media will contain an array of IDs from the medias table
 			var field models.Field
 			field.Name = fieldRequest.Name
+			field.City = fieldRequest.City
 			// Generate slug from name if not provided
 			if fieldRequest.Slug == "" {
 				field.Slug = utils.GenerateSlug(fieldRequest.City, fieldRequest.Name)
@@ -524,7 +419,6 @@ func CreateField() http.HandlerFunc {
 				field.Slug = fieldRequest.Slug
 			}
 			field.Description = fieldRequest.Description
-			field.City = fieldRequest.City
 			field.Address = fieldRequest.Address
 
 			// Use logo ID directly
@@ -534,7 +428,12 @@ func CreateField() http.HandlerFunc {
 			field.Media = fieldRequest.Media
 
 			var err error
-			err = database.DB.QueryRow("INSERT INTO fields (name, slug, description, city, address, logo, media) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+			// Use responsible_id from request if provided, otherwise use AUTH.ID
+			responsibleID := AUTH.ID
+			if fieldRequest.Responsible.ID != 0 {
+				responsibleID = fieldRequest.Responsible.ID
+			}
+			err = database.DB.QueryRow("INSERT INTO fields (name, slug, description, city, address, logo, media, responsible_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
 				field.Name,
 				field.Slug,
 				field.Description,
@@ -542,6 +441,7 @@ func CreateField() http.HandlerFunc {
 				field.Address,
 				field.Logo,
 				field.Media,
+				responsibleID,
 			).Scan(&field.ID)
 			if err != nil {
 				log.Println(err)
@@ -591,10 +491,34 @@ func UpdateField() http.HandlerFunc {
 			return
 		}
 
+		vars := mux.Vars(r)
+		slug := vars["slug"]
+		errorResponse, fieldView := getOneFieldBySlug(slug)
+
+		// Check if there was an error retrieving the field
+		if errorResponse != nil {
+			SendJSONError(w, http.StatusBadRequest, "Не смог найти площадку: "+slug)
+			return
+		}
+
+		// Проверка на право редактирования
+		if IsAdmin(*AUTH) {
+			// Admins can edit any field
+		} else if IsUser(*AUTH) {
+			// Users can only edit fields where they are the responsible person
+			if fieldView.Responsible.ID != AUTH.ID {
+				SendJSONError(w, http.StatusForbidden, "Пользователь не имеет прав на редактирование этой площадки")
+				return
+			}
+		} else {
+			SendJSONError(w, http.StatusForbidden, "Пользователь не имеет прав на редактирование площадок")
+			return
+		}
+
 		if r.Method == http.MethodPut {
-			validation, fieldRequest := validateUpdatedAtFieldRequest(r)
+			validation, fieldRequest := validateUpdatedAtFieldRequest(r, fieldView)
 			if validation != nil {
-				SendJSONError(w, http.StatusBadRequest, validation.Error())
+				SendJSONError(w, http.StatusBadRequest, "Возникла ошибка при проверке данных: "+validation.Error())
 				return
 			}
 
@@ -603,14 +527,14 @@ func UpdateField() http.HandlerFunc {
 			// media will contain an array of IDs from the medias table
 			var field models.Field
 			field.Name = fieldRequest.Name
+			field.City = fieldRequest.City
 			// Generate slug from name if not provided
 			if fieldRequest.Slug == "" {
-				field.Slug = utils.GenerateSlug(fieldRequest.Name)
+				field.Slug = utils.GenerateSlug(fieldRequest.City, fieldRequest.Name)
 			} else {
 				field.Slug = fieldRequest.Slug
 			}
 			field.Description = fieldRequest.Description
-			field.City = fieldRequest.City
 			field.Address = fieldRequest.Address
 
 			// Use logo ID directly
@@ -619,28 +543,39 @@ func UpdateField() http.HandlerFunc {
 			// Use media IDs directly
 			field.Media = fieldRequest.Media
 
-			vars := mux.Vars(r)
-			slug := vars["slug"]
-			errorResponse, fieldView := getOneFieldBySlug(slug)
-
-			_, errUpdate := database.DB.Exec("UPDATE fields SET name = $1, slug = $2, description = $3, city = $4, address = $5, logo = $6, media = $7 WHERE id = $8",
-				field.Name,
-				field.Slug,
-				field.Description,
-				field.City,
-				field.Address,
-				field.Logo,
-				field.Media,
-				fieldView.ID)
+			// Update responsible_id if provided in request
+			var errUpdate error
+			if fieldRequest.Responsible.ID != 0 {
+				_, errUpdate = database.DB.Exec("UPDATE fields SET name = $1, slug = $2, description = $3, city = $4, address = $5, logo = $6, media = $7, responsible_id = $8 WHERE id = $9",
+					field.Name,
+					field.Slug,
+					field.Description,
+					field.City,
+					field.Address,
+					field.Logo,
+					field.Media,
+					fieldRequest.Responsible.ID,
+					fieldView.ID)
+			} else {
+				_, errUpdate = database.DB.Exec("UPDATE fields SET name = $1, slug = $2, description = $3, city = $4, address = $5, logo = $6, media = $7 WHERE id = $8",
+					field.Name,
+					field.Slug,
+					field.Description,
+					field.City,
+					field.Address,
+					field.Logo,
+					field.Media,
+					fieldView.ID)
+			}
 			if errUpdate != nil {
 				log.Println(errUpdate)
-				SendJSONError(w, http.StatusBadRequest, errUpdate.Error())
+				SendJSONError(w, http.StatusBadRequest, "Возникла ошибка при обновлении: "+errUpdate.Error())
 				return
 			}
 
-			errorResponse, fieldView = getOneFieldBySlug(slug)
+			errorResponse, fieldView = getOneFieldBySlug(field.Slug)
 			if errorResponse != nil {
-				SendJSONError(w, http.StatusBadRequest, errorResponse.Error())
+				SendJSONError(w, http.StatusBadRequest, "Возникла ошибка при получении ответа: "+errorResponse.Error())
 				return
 			}
 			json.NewEncoder(w).Encode(fieldView)
