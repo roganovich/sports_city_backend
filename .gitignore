@@ -6,4 +6,4 @@
 bin
 .env.local
 .codeassistantignore
-/public/uploads/*
+/public/upload/*
